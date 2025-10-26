@@ -15,6 +15,7 @@ class StockTransaction extends Model
         'unit_cost',
         'sourceable_id',
         'sourceable_type',
+        'project_id',
     ];
 
     // Get the item this transaction belongs to

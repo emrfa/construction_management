@@ -71,4 +71,24 @@ class Project extends Model
     {
         return $this->hasMany(MaterialRequest::class);
     }
+
+    public function stockTransactions()
+    {
+        return $this->hasMany(\App\Models\StockTransaction::class);
+    }
+
+    public function getMaterialStockSummary()
+    {
+        return \App\Models\InventoryItem::with(['stockTransactions' => function ($q) {
+            $q->where('project_id', $this->id);
+        }])->get()->map(function ($item) {
+            return [
+                'item_code' => $item->item_code,
+                'item_name' => $item->item_name,
+                'uom'       => $item->uom,
+                'quantity'  => $item->stockTransactions->sum('quantity'),
+            ];
+        })->filter(fn($r) => $r['quantity'] != 0);
+    }
+
 }

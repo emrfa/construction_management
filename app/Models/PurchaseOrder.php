@@ -14,6 +14,7 @@ class PurchaseOrder extends Model
         'supplier_id',
         'material_request_id',
         'po_number',
+        'project_id',
         'order_date',
         'expected_delivery_date',
         'status',

@@ -41,9 +41,9 @@ class ProjectController extends Controller
      */
     public function show(Project $project)
     {
-        $project->load('client', 'quotation.items.children', 'quotation.items.progressUpdates', 'billings', 'quotation', 'materialRequests');
-
-        return view('projects.show', compact('project'));
+        $project->load('client', 'quotation.items.children', 'quotation.items.progressUpdates', 'billings', 'quotation', 'materialRequests', 'stockTransactions');
+        $stockSummary = $project->getMaterialStockSummary();
+        return view('projects.show', compact('project', 'stockSummary'));
     }
 
     /**

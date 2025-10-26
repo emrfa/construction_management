@@ -186,6 +186,45 @@
 
                     <hr class="my-6">
 
+                    <div x-data="{ open: false }" class="mt-6 mb-6">
+                        <div class="flex justify-between items-center mb-2 cursor-pointer" @click="open = !open">
+                            <h3 class="text-lg font-semibold">Project Material Stock</h3>
+                            <span x-text="open ? '– Hide' : '+ Show'" class="text-indigo-600 font-medium"></span>
+                        </div>
+
+                        <div x-show="open" x-transition class="overflow-x-auto mt-2">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">UOM</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qty on Hand</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    @forelse ($stockSummary as $row)
+                                        <tr>
+                                            <td class="px-4 py-2">{{ $row['item_code'] }}</td>
+                                            <td class="px-4 py-2">{{ $row['item_name'] }}</td>
+                                            <td class="px-4 py-2">{{ $row['uom'] }}</td>
+                                            <td class="px-4 py-2 text-right">{{ number_format($row['quantity'], 2) }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="4" class="px-4 py-2 text-center text-gray-500">
+                                                No materials received for this project yet.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+
+                    <hr class="my-6">
+
                     <div class="flex justify-between items-center mb-2">
                         <h3 class="text-lg font-semibold">Work Breakdown Structure (WBS) / Plan</h3>
                         <a href="{{ route('progress.create', $project) }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm">

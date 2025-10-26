@@ -92,6 +92,7 @@ class ProgressUpdateController extends Controller
                         // 'unit_cost' => $currentCost, // Store cost if needed
                         'sourceable_id' => $progressUpdate->id, // Link to the ProgressUpdate
                         'sourceable_type' => ProgressUpdate::class,
+                        'project_id' => $project->id,
                     ]);
                 }
             }
@@ -117,7 +118,7 @@ class ProgressUpdateController extends Controller
         $project = $quotation_item->quotation->project;
 
         // Load all progress updates, and for each update, get the user who made it
-        $quotation_item->load('progressUpdates.user');
+        $quotation_item->load('progressUpdates.user', 'progressUpdates.materialUsages.inventoryItem');
 
         return view('progress.history', compact('project', 'quotation_item'));
     }

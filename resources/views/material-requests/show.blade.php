@@ -24,7 +24,7 @@
                             Approve Request
                         </button>
                     </form>
-                @elseif ($materialRequest->status == 'approved') {{-- Check for approved status --}}
+                @elseif ($materialRequest->status === 'approved' || $materialRequest->status === 'partially_fulfilled')
                     @php
                         // Check if there are any items that still need fulfilling
                         $needsFulfillment = $materialRequest->items->some(fn($item) => $item->quantity_requested > $item->quantity_fulfilled);

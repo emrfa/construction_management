@@ -312,7 +312,7 @@ class PurchaseOrderController extends Controller
     $somethingReceived = false;
     // Get the related Material Request ID from the PO header
     $materialRequestId = $purchaseOrder->material_request_id;
-    $projectId = null; // Initialize project ID
+    $projectId = $purchaseOrder->project_id; // Initialize project ID
 
     // If linked to a material request, find the project ID
     if ($materialRequestId) {
@@ -350,7 +350,7 @@ class PurchaseOrderController extends Controller
                     'unit_cost' => $poItem->unit_cost,
                     'sourceable_id' => $purchaseOrder->id,
                     'sourceable_type' => PurchaseOrder::class,
-                    'project_id' => $projectId, // Add project ID here
+                    'project_id' => $projectId, 
                 ]);
 
                 // 5. Update linked Material Request Item (if linked)

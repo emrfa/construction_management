@@ -36,13 +36,31 @@
                                     <td class="px-6 py-4 whitespace-nowrap">{{ $update->user->name }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">{{ $update->percent_complete }}%</td>
                                     <td class="px-6 py-4 whitespace-nowrap">{{ $update->notes }}</td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="4" class="px-6 py-4 whitespace-nowrap text-center text-gray-500">
-                                        No progress updates found for this task.
-                                    </td>
-                                </tr>
+                                   @if ($update->materialUsages?->count())
+        <tr class="bg-gray-50">
+            <td colspan="4" class="px-8 py-2 text-sm text-gray-700">
+                <strong>Materials Used:</strong>
+                <ul class="list-disc ml-5 mt-1">
+                    @foreach ($update->materialUsages as $usage)
+                        <li>
+                            {{ $usage->inventoryItem->item_name }} — 
+                            Qty Used: {{ $usage->quantity_used }}
+                            @if ($usage->inventoryItem->stockTransactions()->where('project_id', $project->id)->exists())
+                                (Remaining Stock: 
+                                {{ $usage->inventoryItem->stockTransactions()->where('project_id', $project->id)->sum('quantity') }})
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+            </td>
+        </tr>
+    @endif
+@empty
+    <tr>
+        <td colspan="4" class="px-6 py-4 whitespace-nowrap text-center text-gray-500">
+            No progress updates found for this task.
+        </td>
+    </tr>
                             @endforelse
                         </tbody>
                     </table>

@@ -328,6 +328,7 @@ private function createPurchaseOrdersIfNeeded(MaterialRequest $materialRequest)
                 'order_date' => now()->toDateString(),
                 'status' => 'draft', // Create as Draft
                 'total_amount' => 0, // Will be calculated when PO items are added/edited
+                'project_id' => $materialRequest->project_id,
                 // TODO: Link PO back to MaterialRequest? Add material_request_id field?
             ]);
 
@@ -359,7 +360,7 @@ private function createPurchaseOrdersIfNeeded(MaterialRequest $materialRequest)
 public function createPurchaseOrder(MaterialRequest $materialRequest)
     {
         // 1. Validation: Ensure request is approved and needs fulfillment
-        if ($materialRequest->status !== 'approved') {
+        if ($materialRequest->status !== 'approved' && $materialRequest->status !== 'partially_fulfilled') {
             return back()->with('error', 'Only approved material requests can generate a PO.');
         }
 
@@ -394,7 +395,7 @@ public function createPurchaseOrder(MaterialRequest $materialRequest)
                 'status' => 'draft',
                 'total_amount' => 0, // Will be calculated/updated in edit
                 // Add project_id to PO if needed (requires migration + model update)
-                // 'project_id' => $materialRequest->project_id,
+                'project_id' => $materialRequest->project_id,
             ]);
 
             // 3. Create Purchase Order Items
