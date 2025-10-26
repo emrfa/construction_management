@@ -15,6 +15,7 @@ use App\Http\Controllers\StockLedgerController;
 use App\Http\Controllers\LaborRateController;
 use App\Http\Controllers\UnitRateAnalysisController;
 use App\Http\Controllers\MaterialRequestController;
+use App\Http\Controllers\ReportController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -45,6 +46,8 @@ Route::middleware('auth')->group(function () {
     Route::resource('projects', ProjectController::class);
     Route::get('/projects/{project}/progress/create', [ProgressUpdateController::class, 'create'])->name('progress.create');
     Route::post('/projects/{project}/progress', [ProgressUpdateController::class, 'store'])->name('progress.store');
+    Route::post('/projects/{project}/complete', [ProjectController::class, 'markAsComplete'])->name('projects.complete');
+    Route::post('/projects/{project}/close', [ProjectController::class, 'markAsClosed'])->name('projects.close');
 
     // Progress Management
     Route::get('/progress/{quotation_item}/history', [ProgressUpdateController::class, 'history'])->name('progress.history');
@@ -88,6 +91,13 @@ Route::middleware('auth')->group(function () {
     Route::resource('material-requests', MaterialRequestController::class);
     Route::post('/material-requests/{materialRequest}/status', [MaterialRequestController::class, 'updateStatus'])->name('material-requests.updateStatus');
     Route::post('/material-requests/{materialRequest}/create-po', [MaterialRequestController::class, 'createPurchaseOrder'])->name('material-requests.createPO');
+
+    // Reporting Routes
+    Route::get('/reports/material-flow/{project}', [ReportController::class, 'materialFlowReport'])
+    ->name('reports.material_flow');
+
+    Route::get('/reports/project-performance/{project}', [ReportController::class, 'projectPerformanceReport'])
+    ->name('reports.project_performance');
 
 });
 

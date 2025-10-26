@@ -77,19 +77,27 @@ class ProgressUpdateController extends Controller
                     // $item = InventoryItem::find($inventoryItemId);
                     // $currentCost = $item->latest_cost ?? 0; // Need to implement latest_cost logic later
 
+                    $costSourceTransaction = StockTransaction::where('inventory_item_id', $inventoryItemId)
+                    ->where('project_id', $project->id) // Make sure cost is project-specific
+                    ->where('quantity', '>', 0) // Look for stock-in transactions
+                    ->latest('created_at')      // Get the most recent one
+                    ->first();
+
+                    $costAtTimeOfUse = $costSourceTransaction ? $costSourceTransaction->unit_cost : 0;
+
                     // Create the Material Usage record
                     MaterialUsage::create([
                         'progress_update_id' => $progressUpdate->id,
                         'inventory_item_id' => $inventoryItemId,
                         'quantity_used' => $quantityUsed,
-                        // 'unit_cost' => $currentCost, // Store cost if needed
+                        'unit_cost' => $costAtTimeOfUse,
                     ]);
 
                     // Create the Stock Transaction (Decrease Stock)
                     StockTransaction::create([
                         'inventory_item_id' => $inventoryItemId,
                         'quantity' => -$quantityUsed, // Negative quantity for stock out
-                        // 'unit_cost' => $currentCost, // Store cost if needed
+                        'unit_cost' => $costAtTimeOfUse,
                         'sourceable_id' => $progressUpdate->id, // Link to the ProgressUpdate
                         'sourceable_type' => ProgressUpdate::class,
                         'project_id' => $project->id,

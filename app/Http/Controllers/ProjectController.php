@@ -63,16 +63,18 @@ class ProjectController extends Controller
         $validated = $request->validate([
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
-            'status' => [
-                'required',
-                Rule::in(['initiated', 'in_progress', 'completed', 'closed']),
-            ],
         ]);
 
         // 2. Update the project
-        $project->update($validated);
+        $project->fill($validated);
+        if ($project->status === 'initiated' && !empty($project->start_date) && !empty($project->end_date)) {
+        $project->status = 'in_progress';
+        }
 
-        // 3. Redirect back to the same page with a success message
+        // 3 Save the project
+        $project->save();
+
+        // 4. Redirect back to the same page with a success message
         return redirect()->route('projects.show', $project)
                          ->with('success', 'Project details updated successfully.');
     }
@@ -83,5 +85,33 @@ class ProjectController extends Controller
     public function destroy(Project $project)
     {
         //
+    }
+
+    /**
+     * Mark the project as completed.
+     */
+    public function markAsComplete(Project $project)
+    {
+        if ($project->status === 'in_progress') {
+            $project->status = 'completed';
+            $project->actual_end_date = now()->toDateString();
+            $project->save();
+            return redirect()->route('projects.show', $project)->with('success', 'Project marked as Completed.');
+        }
+        return redirect()->route('projects.show', $project)->with('error', 'Project must be In Progress to be marked as Completed.');
+    }
+
+    /**
+     * Mark the project as closed.
+     */
+    public function markAsClosed(Project $project)
+    {
+        // Add validation/checks if needed (e.g., ensure it's 'completed' first)
+        if ($project->status === 'completed') {
+            $project->status = 'closed';
+            $project->save();
+            return redirect()->route('projects.show', $project)->with('success', 'Project marked as Closed.');
+        }
+        return redirect()->route('projects.show', $project)->with('error', 'Project must be Completed to be marked as Closed.');
     }
 }
