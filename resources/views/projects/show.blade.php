@@ -8,21 +8,19 @@
             <span>{{ $project->project_code }}</span>
         </h2>
     </x-slot>
-
+    
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
 
-                    <form method="POST" action="{{ route('projects.update', $project) }}">
-                        @csrf
-                        @method('PUT')
+                    
 
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-lg font-semibold">Project Summary</h3>
                             <div class="flex items-center space-x-1">
                            @if ($project->status === 'initiated')
-                                <x-primary-button>
+                                <x-primary-button onclick="document.getElementById('project-update-form').submit();">
                                     {{ __('Save Changes') }}
                                 </x-primary-button>
                             @endif
@@ -33,7 +31,6 @@
                             <a href="{{ route('reports.project_performance', $project) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-100 border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150">
                                 📈 Performance Report
                             </a>
-
                             @if ($project->status == 'in_progress')
                                 <form method="POST" action="{{ route('projects.complete', $project) }}" onsubmit="return confirm('Are you sure you want to mark this project as completed?');" class="inline">
                                     @csrf
@@ -53,8 +50,12 @@
                                     Project Closed
                                 </span>
                             @endif
+                            </div>
                         </div>
-                        </div>
+
+                        <form method="POST" action="{{ route('projects.update', $project) }}" id="project-update-form">
+                        @csrf
+                        @method('PUT')
 
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                             <div>

@@ -16,6 +16,8 @@ use App\Http\Controllers\LaborRateController;
 use App\Http\Controllers\UnitRateAnalysisController;
 use App\Http\Controllers\MaterialRequestController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\EquipmentController;
+
 
 use Illuminate\Support\Facades\Route;
 
@@ -98,6 +100,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/reports/project-performance/{project}', [ReportController::class, 'projectPerformanceReport'])
     ->name('reports.project_performance');
+
+    // Equipment
+    Route::resource('equipment', EquipmentController::class);
 
 });
 

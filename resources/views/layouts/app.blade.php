@@ -76,6 +76,10 @@
                                     class="block px-4 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 {{ request()->routeIs('inventory-items.*') ? 'bg-gray-100 font-semibold' : '' }}">
                                         {{ __('Item Master') }}
                                 </a>
+                                <a href="{{ route('equipment.index') }}"
+                                class="block px-4 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 {{ request()->routeIs('equipment.*') ? 'bg-gray-100 font-semibold' : '' }}">
+                                    {{ __('Equipment') }}
+                                </a>
                                 <a href="{{ route('labor-rates.index') }}"
                                 class="block px-4 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 {{ request()->routeIs('labor-rates.*') ? 'bg-gray-100 font-semibold' : '' }}">
                                     {{ __('Labor Rates') }}
