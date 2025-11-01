@@ -19,4 +19,9 @@ class LaborRate extends Model
     {
         return $this->hasMany(UnitRateLabor::class);
     }
+
+    public function laborUsages()
+    {
+        return $this->hasMany(LaborUsage::class);
+    }
 }

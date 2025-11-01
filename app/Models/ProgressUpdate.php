@@ -36,4 +36,9 @@ class ProgressUpdate extends Model
         return $this->hasMany(MaterialUsage::class);
     }
 
+    public function laborUsages()
+    {
+        return $this->hasMany(LaborUsage::class);
+    }
+
 }

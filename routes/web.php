@@ -112,6 +112,10 @@ Route::middleware('auth')->group(function () {
     // Work Library - Items
     Route::resource('work-items', WorkItemController::class);
 
+    // S Curve (Time Scheduler)
+    Route::get('/projects/{project}/scheduler', [ProjectController::class, 'showScheduler'])->name('projects.scheduler');
+    Route::post('/projects/{project}/scheduler', [ProjectController::class, 'storeScheduler'])->name('projects.scheduler.store');
+
 });
 
 require __DIR__.'/auth.php';

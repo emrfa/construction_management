@@ -228,7 +228,6 @@ class Project extends Model
                  $materialSummary->put($inventoryItemId, $currentItem);
                  // --- End fix ---
             }
-            // Else: Stock exists but wasn't budgeted, ignore for now
         }
 
         return $materialSummary->sortBy('item_code')->values();
@@ -239,4 +238,8 @@ class Project extends Model
         return $this->hasMany(PurchaseOrder::class);
     }
 
+    public function laborUsages()
+    {
+        return $this->hasMany(LaborUsage::class);
+    }
 }

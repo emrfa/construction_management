@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\QuotationItem;
 
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class ProjectController extends Controller
 {
@@ -113,5 +115,63 @@ class ProjectController extends Controller
             return redirect()->route('projects.show', $project)->with('success', 'Project marked as Closed.');
         }
         return redirect()->route('projects.show', $project)->with('error', 'Project must be Completed to be marked as Closed.');
+    }
+
+    /**
+     * Display the project scheduler page.
+     */
+    public function showScheduler(Project $project)
+    {
+        // Load the entire WBS, including all nested children
+        $project->load('quotation.items.children');
+        
+        // We get the root items from the quotation
+        $items = $project->quotation->items;
+
+        return view('projects.scheduler', compact('project', 'items'));
+    }
+
+    /**
+     * Store the planned dates from the project scheduler.
+     */
+    public function storeScheduler(Request $request, Project $project)
+    {
+        // 1. Validate the incoming data
+        // We expect an array of items
+        $validated = $request->validate([
+            'items' => 'required|array',
+            'items.*.id' => 'required|exists:quotation_items,id',
+            'items.*.planned_start' => 'nullable|date',
+            'items.*.planned_end' => 'nullable|date|after_or_equal:items.*.planned_start',
+        ]);
+
+        // 2. Get all IDs from the project's quotation to be safe
+        $allowedItemIds = $project->quotation->allItems()->pluck('id');
+
+        DB::beginTransaction();
+        try {
+            // 3. Loop and update each item
+            foreach ($validated['items'] as $itemData) {
+                
+                // Security Check: Ensure the item belongs to this project's quotation
+                if ($allowedItemIds->contains($itemData['id'])) {
+                    
+                    // Find the item and update it
+                    QuotationItem::where('id', $itemData['id'])->update([
+                        'planned_start' => $itemData['planned_start'],
+                        'planned_end' => $itemData['planned_end'],
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Error saving schedule: ' . $e->getMessage());
+        }
+
+        // 4. Redirect back with success
+        return redirect()->route('projects.show', $project)->with('success', 'Project schedule updated successfully.');
     }
 }

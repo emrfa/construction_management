@@ -147,6 +147,10 @@
                                 </p>
                             </div>
                         </div>
+
+                        <a href="{{ route('projects.scheduler', $project) }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50">
+                            Edit Schedule
+                        </a>
                     </form>
 
                     <hr class="my-6">

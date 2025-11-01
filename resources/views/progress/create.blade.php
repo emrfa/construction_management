@@ -1,150 +1,172 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            <a href="{{ route('projects.show', $project) }}" class="text-indigo-600 hover:text-indigo-900">
-                &larr; {{ $project->project_code }}
-            </a>
-            <span class="text-gray-500">/</span>
-            <span>Add Progress Update</span>
+            Log Progress for: {{ $project->quotation->project_name }}
         </h2>
     </x-slot>
 
     <div class="py-12">
-        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
+        <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
 
-                    <div x-data="progressForm()">
-
-                        <form method="POST" action="{{ route('progress.store', $project) }}">
-                            @csrf
-
+                    <form method="POST" action="{{ route('progress.store', $project) }}">
+                        @csrf
+                        
+                        {{-- Main Progress Details --}}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                             <div>
-                                <x-input-label for="quotation_item_id" :value="__('Task')" />
-                                <select id="quotation_item_id" name="quotation_item_id" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" required>
-                                    <option value="">Select a task to update...</option>
+                                <label for="quotation_item_id" class="block font-medium text-sm text-gray-700">Task (WBS Item)</label>
+                                <select id="quotation_item_id" name="quotation_item_id" class="task-select block mt-1 w-full border-gray-300 rounded-md shadow-sm" required>
+                                    <option value="">-- Select a Task --</option>
                                     @foreach ($tasks as $task)
-                                        <option value="{{ $task->id }}">
-                                            {{ $task->description }} (Current: {{ $task->latest_progress }}%)
+                                        <option value="{{ $task->id }}" {{ old('quotation_item_id') == $task->id ? 'selected' : '' }}>
+                                            {{ $task->description }}
                                         </option>
                                     @endforeach
                                 </select>
+                                <x-input-error :messages="$errors->get('quotation_item_id')" class="mt-2" />
+                            </div>
+                            
+                            <div>
+                                <label for="date" class="block font-medium text-sm text-gray-700">Date</label>
+                                <input type="date" id="date" name="date" value="{{ old('date', date('Y-m-d')) }}" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" required>
+                                <x-input-error :messages="$errors->get('date')" class="mt-2" />
                             </div>
 
-                            <div class="mt-4">
-                                <x-input-label for="date" :value="__('Date of Work')" />
-                                <x-text-input id="date" class="block mt-1 w-full" type="date" name="date" :value="old('date', date('Y-m-d'))" required />
+                            {{-- === THIS IS THE NEW FIELD === --}}
+                            <div>
+                                <label for="percent_complete" class="block font-medium text-sm text-gray-700">New Total Progress (%)</label>
+                                <input type="number" step="0.01" min="0" max="100" id="percent_complete" name="percent_complete" value="{{ old('percent_complete') }}" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" required>
+                                <x-input-error :messages="$errors->get('percent_complete')" class="mt-2" />
                             </div>
+                            {{-- === END OF NEW FIELD === --}}
+                        </div>
 
-                            <div class="mt-4">
-                                <x-input-label for="percent_complete" :value="__('New Percent Complete (Total)')" />
-                                <x-text-input id="percent_complete" class="block mt-1 w-full" type="number" name="percent_complete" :value="old('percent_complete')" min="0" max="100" required />
-                                <p class="text-sm text-gray-600 mt-1">Enter the new *total* percentage for this task (e.g., if it was 20% and you did 10% more, enter 30).</p>
-                            </div>
+                        <div class="mb-6">
+                            <label for="notes" class="block font-medium text-sm text-gray-700">Notes (Optional)</label>
+                            <textarea id="notes" name="notes" rows="3" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm">{{ old('notes') }}</textarea>
+                            <x-input-error :messages="$errors->get('notes')" class="mt-2" />
+                        </div>
 
-                            <div class="mt-4">
-                                <x-input-label for="notes" :value="__('Notes (Optional)')" />
-                                <textarea id="notes" name="notes" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">{{ old('notes') }}</textarea>
-                            </div>
-
-                            <hr class="my-6">
-
-                            <h3 class="text-lg font-semibold mb-2">Materials Used (Optional)</h3>
+                        {{-- Alpine Component for Dynamic Rows --}}
+                        <div x-data="costLogger()">
+                            
+                            {{-- 1. Materials Used --}}
+                            <h3 class="text-lg font-semibold border-b pb-2 mb-4">Materials Used</h3>
                             <div class="space-y-4">
                                 <template x-for="(material, index) in materials" :key="index">
-                                    <div class="flex items-center space-x-2 p-2 bg-gray-50 rounded" x-init="initializeTomSelect($el.querySelector('.tom-select-materials'))">
-                                        <div class="flex-1">
-                                            <label :for="`material_id_${index}`" class="block font-medium text-sm text-gray-700">{{ __('Material') }}</label>
-                                            <select x-model="material.inventory_item_id" :id="`material_id_${index}`" :name="`materials[${index}][inventory_item_id]`" class="tom-select-materials block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
-                                                <option value="">Select material...</option>
-                                                @foreach ($inventoryItems as $invItem)
-                                                    <option value="{{ $invItem->id }}">{{ $invItem->item_code }} - {{ $invItem->item_name }} ({{ $invItem->uom }})</option>
+                                    <div class="grid grid-cols-12 gap-4 items-center">
+                                        <div class="col-span-7">
+                                            <label class="sr-only">Material Item</label>
+                                            <select :name="`materials[${index}][inventory_item_id]`" class="item-select block w-full border-gray-300 rounded-md shadow-sm" x-init="initializeSelects($el)">
+                                                <option value="">-- Select Material --</option>
+                                                @foreach ($inventoryItems as $item)
+                                                    <option value="{{ $item->id }}">{{ $item->item_name }} ({{ $item->uom }})</option>
                                                 @endforeach
                                             </select>
                                         </div>
-                                        <div class="w-24">
-                                            <label :for="`material_qty_${index}`" class="block font-medium text-sm text-gray-700">{{ __('Qty Used') }}</label>
-                                            <input x-model.number="material.quantity_used" :id="`material_qty_${index}`" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" type="number" :name="`materials[${index}][quantity_used]`" min="0" step="0.01" />
+                                        <div class="col-span-3">
+                                            <label class="sr-only">Quantity</label>
+                                            <input type="number" step="0.01" :name="`materials[${index}][quantity_used]`" placeholder="Quantity Used" class="block w-full border-gray-300 rounded-md shadow-sm">
                                         </div>
-                                        <div class="pt-5">
-                                            <button type="button" @click="removeMaterial(index)" class="text-red-500 hover:text-red-700 font-bold p-2"> X </button>
+                                        <div class="col-span-2">
+                                            <button type="button" @click="removeMaterial(index)" class="text-red-600 hover:text-red-800 text-sm">Remove</button>
                                         </div>
                                     </div>
                                 </template>
                             </div>
-                            <div class="mt-4">
-                                <button type="button" @click="addNewMaterial()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded text-sm">
-                                    + Add Material Used
-                                </button>
-                            </div>
-                            <div class="flex items-center justify-end mt-6">
-                                <a href="{{ route('projects.show', $project) }}" class="text-sm text-gray-600 hover:text-gray-900 rounded-md">
-                                    {{ __('Cancel') }}
-                                </a>
+                            <button type="button" @click="addMaterial" class="mt-4 text-sm text-blue-600 hover:text-blue-800">+ Add Material</button>
+                            <x-input-error :messages="$errors->get('materials')" class="mt-2" />
 
-                                <x-primary-button class="ml-4">
-                                    {{ __('Save Progress') }}
-                                </x-primary-button>
+                            {{-- 2. Labor Used --}}
+                            <h3 class="text-lg font-semibold border-b pb-2 mb-4 mt-8">Labor Used</h3>
+                            <div class="space-y-4">
+                                <template x-for="(labor, index) in labors" :key="index">
+                                    <div class="grid grid-cols-12 gap-4 items-center">
+                                        <div class="col-span-7">
+                                            <label class="sr-only">Labor Type</label>
+                                            <select :name="`labors[${index}][labor_rate_id]`" class="item-select block w-full border-gray-300 rounded-md shadow-sm" x-init="initializeSelects($el)">
+                                                <option value="">-- Select Labor --</option>
+                                                @foreach ($laborRates as $rate)
+                                                    <option value="{{ $rate->id }}">{{ $rate->labor_type }} ({{ $rate->unit }})</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-span-3">
+                                            <label class="sr-only">Quantity</label>
+                                            <input type="number" step="0.01" :name="`labors[${index}][quantity_used]`" placeholder="Quantity Used" class="block w-full border-gray-300 rounded-md shadow-sm">
+                                        </div>
+                                        <div class="col-span-2">
+                                            <button type="button" @click="removeLabor(index)" class="text-red-600 hover:text-red-800 text-sm">Remove</button>
+                                        </div>
+                                    </div>
+                                </template>
                             </div>
-                        </form>
+                            <button type="button" @click="addLabor" class="mt-4 text-sm text-blue-600 hover:text-blue-800">+ Add Labor</button>
+                            <x-input-error :messages="$errors->get('labors')" class="mt-2" />
 
-                    </div> </div>
+                        </div>
+
+                        {{-- Form Actions --}}
+                        <div class="flex items-center justify-end mt-8 border-t pt-6">
+                            <a href="{{ route('projects.show', $project) }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50">
+                                {{ __('Cancel') }}
+                            </a>
+                            <button type="submit" class="ml-4 inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700">
+                                {{ __('Log Progress') }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 
+    @push('head-scripts')
     <script>
-        function progressForm() {
-            return {
-                materials: [ { inventory_item_id: '', quantity_used: 1 } ],
-                addNewMaterial() {
-                    this.materials.push({ inventory_item_id: '', quantity_used: 1 });
-                    // Use $nextTick to ensure the DOM is updated before initializing Tom Select
-                    this.$nextTick(() => {
-                        let selects = this.$el.querySelectorAll('.tom-select-materials:not(.ts-wrapper)'); // Target only non-initialized selects
-                        if (selects.length > 0) {
-                             // Initialize the *last* one added
-                            this.initializeTomSelect(selects[selects.length - 1]);
-                        }
-                    });
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('costLogger', () => ({
+                materials: [],
+                labors: [],
+                
+                init() {
+                    @if(old('materials'))
+                        this.materials = @json(old('materials')).map(m => ({...m}));
+                    @else
+                        this.addMaterial();
+                    @endif
+
+                    @if(old('labors'))
+                        this.labors = @json(old('labors')).map(l => ({...l}));
+                    @else
+                        this.addLabor();
+                    @endif
+
+                    this.initializeSelects(document.querySelector('.task-select'));
+                },
+
+                addMaterial() {
+                    this.materials.push({});
                 },
                 removeMaterial(index) {
-                     // Find the select element before removing the data
-                    let row = this.$el.querySelectorAll('.flex.items-center.space-x-2.p-2.bg-gray-50.rounded')[index];
-                    let select = row ? row.querySelector('.tom-select-materials') : null;
-                    // Destroy Tom Select instance if it exists
-                    if (select && select.tomselect) {
-                        select.tomselect.destroy();
-                    }
                     this.materials.splice(index, 1);
                 },
-                 // Function to initialize TomSelect on a given element
-                initializeTomSelect(element) {
-                    if (element && !element.tomselect) { // Check if not already initialized
-                       new TomSelect(element, {
-                            create: false,
-                            sortField: { field: "text", direction: "asc" }
-                        });
-                    }
-                },
-                // Initialize TomSelect for the main task dropdown on page load
-                init() {
-                     new TomSelect('#quotation_item_id',{
-                        create: false,
-                        sortField: { field: "text", direction: "asc" }
-                    });
-                    // Initialize TomSelect for any initial material rows (if needed)
-                    // this.$nextTick(() => {
-                    //     this.$el.querySelectorAll('.tom-select-materials').forEach(el => this.initializeTomSelect(el));
-                    // });
-                }
-            }
-        }
 
-        // Initialize the component when the DOM is ready
-        // document.addEventListener('alpine:init', () => {
-        //     Alpine.data('progressForm', progressForm);
-        // });
-        // Removed DOMContentLoaded listener as Alpine handles init now
+                addLabor() {
+                    this.labors.push({});
+                },
+                removeLabor(index) {
+                    this.labors.splice(index, 1);
+                },
+
+                initializeSelects(element) {
+                    if (typeof TomSelect !== 'undefined' && element && !element.tomselect) {
+                        new TomSelect(element, { create: false, sortField: { field: "text", direction: "asc" } });
+                    }
+                }
+            }));
+        });
     </script>
+    @endpush
 </x-app-layout>

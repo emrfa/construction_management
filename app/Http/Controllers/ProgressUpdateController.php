@@ -8,6 +8,8 @@ use App\Models\ProgressUpdate;
 use App\Models\InventoryItem;
 use App\Models\MaterialUsage;
 use App\Models\StockTransaction;
+use App\Models\LaborRate;
+use App\Models\LaborUsage;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -26,11 +28,11 @@ class ProgressUpdateController extends Controller
             return $item->children->isEmpty();
         });
 
-        // ADD THIS LINE to get inventory items
         $inventoryItems = InventoryItem::orderBy('item_name')->get();
+        $laborRates = LaborRate::orderBy('labor_type')->get();
 
         // Pass the new variable to the view
-        return view('progress.create', compact('project', 'tasks', 'inventoryItems'));
+        return view('progress.create', compact('project', 'tasks', 'inventoryItems', 'laborRates'));
     }
 
     /**
@@ -38,96 +40,90 @@ class ProgressUpdateController extends Controller
      */
     public function store(Request $request, Project $project)
     {
-        // 1. Validate the main progress data AND the materials array
+        // 1. Validate the main data, percentage, materials, AND labor
         $validated = $request->validate([
             'quotation_item_id' => 'required|exists:quotation_items,id',
             'date' => 'required|date',
-            'percent_complete' => 'required|numeric|min:0|max:100',
+            'percent_complete' => 'required|numeric|min:0|max:100', // <-- IT'S BACK
             'notes' => 'nullable|string',
-            // Validate materials array (optional, allows empty submissions)
+
+            // Materials
             'materials' => 'nullable|array',
-            'materials.*.inventory_item_id' => 'required_with:materials|exists:inventory_items,id', // Required if materials array is present
-            'materials.*.quantity_used' => 'required_with:materials|numeric|min:0.01', // Required if materials array is present
+            'materials.*.inventory_item_id' => 'required_with:materials|exists:inventory_items,id',
+            'materials.*.quantity_used' => 'required_with:materials|numeric|min:0.01',
+            
+            // Labor
+            'labors' => 'nullable|array',
+            'labors.*.labor_rate_id' => 'required_with:labors|exists:labor_rates,id',
+            'labors.*.quantity_used' => 'required_with:labors|numeric|min:0.01',
         ]);
 
+        DB::beginTransaction();
         try {
-            DB::beginTransaction();
-
-            // 2. Create the main Progress Update record
+            // 2. Create the main Progress Update record (WITH percentage)
             $progressUpdate = ProgressUpdate::create([
                 'quotation_item_id' => $validated['quotation_item_id'],
                 'user_id' => Auth::id(),
                 'date' => $validated['date'],
-                'percent_complete' => $validated['percent_complete'],
+                'percent_complete' => $validated['percent_complete'], // <-- IT'S BACK
                 'notes' => $validated['notes'],
             ]);
 
-            // 3. Process Materials Used (if any were submitted)
+            // 3. Process Materials Used (if any)
             if (!empty($validated['materials'])) {
-                foreach ($validated['materials'] as $materialData) {
-                    // Ensure both fields are present for a material entry
-                    if (empty($materialData['inventory_item_id']) || empty($materialData['quantity_used'])) {
-                        continue; // Skip incomplete material entries
-                    }
-
-                    $quantityUsed = (float) $materialData['quantity_used'];
-                    $inventoryItemId = $materialData['inventory_item_id'];
-
-                    // Optional: Get the current cost of the item for logging
-                    // $item = InventoryItem::find($inventoryItemId);
-                    // $currentCost = $item->latest_cost ?? 0; // Need to implement latest_cost logic later
-
+                foreach ($validated['materials'] as $material) {
+                    $inventoryItemId = $material['inventory_item_id'];
+                    $quantityUsed = $material['quantity_used'];
+                    
                     $costSourceTransaction = StockTransaction::where('inventory_item_id', $inventoryItemId)
-                    ->where('project_id', $project->id) // Make sure cost is project-specific
-                    ->where('quantity', '>', 0) // Look for stock-in transactions
-                    ->latest('created_at')      // Get the most recent one
-                    ->first();
+                        ->where('project_id', $project->id)
+                        ->where('quantity', '>', 0)
+                        ->latest('created_at')
+                        ->first();
+                    
+                    $unitCost = $costSourceTransaction ? $costSourceTransaction->unit_cost : 0;
 
-                    $costAtTimeOfUse = $costSourceTransaction ? $costSourceTransaction->unit_cost : 0;
-
-                    // Create the Material Usage record
                     MaterialUsage::create([
                         'progress_update_id' => $progressUpdate->id,
                         'inventory_item_id' => $inventoryItemId,
                         'quantity_used' => $quantityUsed,
-                        'unit_cost' => $costAtTimeOfUse,
+                        'unit_cost' => $unitCost,
                     ]);
 
-                    // Create the Stock Transaction (Decrease Stock)
                     StockTransaction::create([
                         'inventory_item_id' => $inventoryItemId,
-                        'quantity' => -$quantityUsed, // Negative quantity for stock out
-                        'unit_cost' => $costAtTimeOfUse,
-                        'sourceable_id' => $progressUpdate->id, // Link to the ProgressUpdate
-                        'sourceable_type' => ProgressUpdate::class,
                         'project_id' => $project->id,
+                        'quantity' => -$quantityUsed,
+                        'unit_cost' => $unitCost,
+                        'sourceable_id' => $progressUpdate->id,
+                        'sourceable_type' => ProgressUpdate::class,
+                    ]);
+                }
+            }
+
+            // 4. Process Labor Used (if any)
+            if (!empty($validated['labors'])) {
+                foreach ($validated['labors'] as $labor) {
+                    $laborRateId = $labor['labor_rate_id'];
+                    $quantityUsed = $labor['quantity_used'];
+                    $laborRate = LaborRate::find($laborRateId);
+                    
+                    LaborUsage::create([
+                        'progress_update_id' => $progressUpdate->id,
+                        'labor_rate_id' => $laborRateId,
+                        'quantity_used' => $quantityUsed,
+                        'unit_cost' => $laborRate->rate,
                     ]);
                 }
             }
 
             DB::commit();
-
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withInput()->withErrors('Error saving progress update: ' . $e->getMessage());
+            return back()->withInput()->withErrors('Error saving progress: ' + $e->getMessage());
         }
 
-        // 4. Redirect back to the project dashboard
         return redirect()->route('projects.show', $project)
-                         ->with('success', 'Progress update and material usage saved successfully.');
-    }
-
-        /**
-     * Display the progress history for a specific task.
-     */
-    public function history(QuotationItem $quotation_item)
-    {
-        // Load the associated project to build the "back" link
-        $project = $quotation_item->quotation->project;
-
-        // Load all progress updates, and for each update, get the user who made it
-        $quotation_item->load('progressUpdates.user', 'progressUpdates.materialUsages.inventoryItem');
-
-        return view('progress.history', compact('project', 'quotation_item'));
+            ->with('success', 'Progress and costs logged successfully.');
     }
 }
