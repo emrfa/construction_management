@@ -24,6 +24,12 @@
                             {{ session('success') }}
                         </div>
                     @endif
+                    
+                    @if(session('error'))
+                        <div class="mb-4 p-4 bg-red-100 border border-red-300 text-red-800 rounded-md">
+                            {{ session('error') }}
+                        </div>
+                    @endif
 
                     <div class="overflow-x-auto border rounded-md">
                         <table class="min-w-full divide-y divide-gray-200">
@@ -41,16 +47,19 @@
                                 @forelse ($workTypes as $type)
                                     <tr class="hover:bg-gray-50 transition duration-150">
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            <a href="{{-- route('work-types.show', $type) --}}" class="text-indigo-600 hover:text-indigo-800 hover:underline">
+                                            {{-- --- FIX: Uncommented this route --- --}}
+                                            <a href="{{ route('work-types.show', $type) }}" class="text-indigo-600 hover:text-indigo-800 hover:underline">
                                                 {{ $type->name }}
                                             </a>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                                            <a href="{{-- route('work-types.edit', $type) --}}" class="text-indigo-600 hover:text-indigo-800" title="Edit / Manage Work Items">
+                                            {{-- --- FIX: Uncommented this route --- --}}
+                                            <a href="{{ route('work-types.edit', $type) }}" class="text-indigo-600 hover:text-indigo-800" title="Edit / Manage Work Items">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                             </a>
                                             
-                                            <form class="inline-block" action="{{-- route('work-types.destroy', $type) --}}" method="POST" onsubmit="return confirm('Are you sure?');">
+                                            {{-- --- FIX: Uncommented this route --- --}}
+                                            <form class="inline-block" action="{{ route('work-types.destroy', $type) }}" method="POST" onsubmit="return confirm('Are you sure?');">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="text-red-600 hover:text-red-800" title="Delete">

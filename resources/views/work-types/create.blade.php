@@ -1,67 +1,51 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Add New Work Type') }} </h2>
+            {{ __('Create New Work Type') }}
+        </h2>
     </x-slot>
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
-
-                    @if ($errors->any())
-                        <div class="mb-4 p-4 bg-red-100 border border-red-300 text-red-800 rounded-md">
-                            <strong>Please correct the errors below:</strong>
-                            <ul class="mt-2 list-disc list-inside">
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
-
-                    <form method="POST" action="{{ route('work-types.store') }}" class="space-y-6">
+                    <form method="POST" action="{{ route('work-types.store') }}">
                         @csrf
 
                         <div>
-                            <label for="name" class="block font-medium text-sm text-gray-700">
-                                Work Type Name
-                            </label>
-                            <input type="text" name="name" id="name" value="{{ old('name') }}" required 
-                                   class="block w-full mt-1 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm @error('name') border-red-500 @enderror">
-                            @error('name')
-                                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
+                            <x-input-label for="name" :value="__('Work Type Name')" />
+                            <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name')" required autofocus />
+                            <x-input-error :messages="$errors->get('name')" class="mt-2" />
                         </div>
 
-                        <div>
-                            <label for="select-work-items" class="block font-medium text-sm text-gray-700">
-                                Work Items
-                            </label>
-                            <select name="work_items[]" id="select-work-items" multiple 
-                                    placeholder="Search for Work Items to add..."
-                                    autocomplete="off"
-                                    class="block w-full mt-1 rounded-md shadow-sm">
-                                
-                                @foreach ($allWorkItems as $item)
+                        <div class="mt-4">
+                            <x-input-label for="work_items" :value="__('Child Work Items (if this is a Group)')" />
+                            <select id="tom-select-work-items" name="work_items[]" multiple placeholder="Select work items...">
+                                @foreach($allWorkItems as $item)
                                     <option value="{{ $item->id }}" {{ in_array($item->id, old('work_items', [])) ? 'selected' : '' }}>
                                         {{ $item->name }}
                                     </option>
                                 @endforeach
                             </select>
-                            <p class="mt-1 text-sm text-gray-500">
-                                This is the "recipe" or "menu" for the Work Type.
-                            </p>
+                            <x-input-error :messages="$errors->get('work_items')" class="mt-2" />
                         </div>
 
-                        <div class="flex items-center justify-end pt-4">
-                            <a href="{{ route('work-types.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
-                                {{ __('Cancel') }}
-                            </a>
+                        <div class="mt-4">
+                            <x-input-label for="ahs_items" :value="__('Direct AHS Links (if this is a Task)')" />
+                            <select id="tom-select-ahs-items" name="ahs_items[]" multiple placeholder="Select AHS items...">
+                                @foreach($allAHS as $ahs)
+                                    <option value="{{ $ahs->id }}" {{ in_array($ahs->id, old('ahs_items', [])) ? 'selected' : '' }}>
+                                        {{ $ahs->code }} - {{ $ahs->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <x-input-error :messages="$errors->get('ahs_items')" class="mt-2" />
+                        </div>
 
-                            <button type="submit" class="ml-4 inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:border-blue-800 focus:ring ring-blue-300 disabled:opacity-25 transition ease-in-out duration-150">
-                                {{ __('Save Work Type') }}
-                            </button>
+                        <div class="flex items-center justify-end mt-4">
+                            <x-primary-button>
+                                {{ __('Create Work Type') }}
+                            </x-primary-button>
                         </div>
                     </form>
                 </div>
@@ -72,23 +56,15 @@
     @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            if (typeof TomSelect !== 'undefined') {
-                new TomSelect('#select-work-items',{
-                    plugins: ['remove_button'],
-                    create: false,
-                    maxItems: 100,
-                    render: {
-                        option: function(data, escape) {
-                            return `<div>${escape(data.text)}</div>`;
-                        },
-                        item: function(data, escape) {
-                            return `<div>${escape(data.text)}</div>`;
-                        }
-                    }
-                });
-            } else {
-                console.error('TomSelect is not loaded. Please check your app.blade.php file.');
-            }
+            new TomSelect('#tom-select-work-items', {
+                plugins: ['remove_button'],
+                create: false,
+            });
+            
+            new TomSelect('#tom-select-ahs-items', {
+                plugins: ['remove_button'],
+                create: false,
+            });
         });
     </script>
     @endpush

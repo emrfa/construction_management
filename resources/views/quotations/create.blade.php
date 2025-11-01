@@ -272,44 +272,73 @@
                     }
                 },
 
-                // Adds a NEW parent section pre-filled from a Work Type.
+                // ==================================================================
+                // --- THIS IS THE FULLY REPLACED AND CORRECTED FUNCTION ---
+                // ==================================================================
                 addWorkType(workTypeId, targetArray) {
                     if (!workTypeId) return;
                     const workType = this.library.workTypes.find(wt => wt.id == workTypeId);
                     if (!workType) return;
 
+                    // 1. Create the main parent item for the Work Type
                     let newWorkTypeItem = this.newItem(true, true); // isParent: true, isWorkType: true
                     newWorkTypeItem.description = workType.name;
 
-                    workType.work_items.forEach(workItem => {
-                        let newWorkItem = this.newItem(true, false); // isParent: true, isWorkType: false
-                        newWorkItem.description = workItem.name;
-                        
-                        workItem.unit_rate_analyses.forEach(ahs => {
-                            let newAhsItem = this.newItem(false, false);
+                    // 2. NEW: Check for and add DIRECT AHS links as line items
+                    if (workType.unit_rate_analyses && workType.unit_rate_analyses.length > 0) {
+                        workType.unit_rate_analyses.forEach(ahs => {
+                            let newAhsItem = this.newItem(false, false); // isParent: false
                             newAhsItem.unit_rate_analysis_id = ahs.id;
-                            newAhsItem.description = ahs.name;
+                            newAhsItem.description = ahs.name; // Use AHS name directly
                             newAhsItem.item_code = ahs.code;
                             newAhsItem.uom = ahs.unit;
                             newAhsItem.unit_price = parseFloat(ahs.total_cost) || 0;
-                            newAhsItem.quantity = 1;
-                            newWorkItem.children.push(newAhsItem);
+                            newAhsItem.quantity = 1; // Default to 1
+                            newWorkTypeItem.children.push(newAhsItem); // Add to the Work Type's children
                         });
-                        
-                        if (newWorkItem.children.length > 0) {
-                            newWorkTypeItem.children.push(newWorkItem);
-                        }
-                    });
+                    }
 
+                    // 3. EXISTING: Check for and add CHILD WORK ITEMS as sub-parents
+                    if (workType.work_items && workType.work_items.length > 0) {
+                        workType.work_items.forEach(workItem => {
+                            let newWorkItem = this.newItem(true, false); // isParent: true
+                            newWorkItem.description = workItem.name;
+                            
+                            // Check if the work item has AHS links
+                            if (workItem.unit_rate_analyses && workItem.unit_rate_analyses.length > 0) {
+                                workItem.unit_rate_analyses.forEach(ahs => {
+                                    let newAhsItem = this.newItem(false, false);
+                                    newAhsItem.unit_rate_analysis_id = ahs.id;
+                                    newAhsItem.description = ahs.name;
+                                    newAhsItem.item_code = ahs.code;
+                                    newAhsItem.uom = ahs.unit;
+                                    newAhsItem.unit_price = parseFloat(ahs.total_cost) || 0;
+                                    newAhsItem.quantity = 1;
+                                    newWorkItem.children.push(newAhsItem);
+                                });
+                            }
+                            
+                            // Only add the child Work Item if it actually contains AHS items
+                            if (newWorkItem.children.length > 0) {
+                                newWorkTypeItem.children.push(newWorkItem);
+                            }
+                        });
+                    }
+
+                    // 4. Final check: Only add the Work Type if it produced any children
                     if (newWorkTypeItem.children.length > 0) {
                         targetArray.push(newWorkTypeItem);
                         this.$nextTick(() => { 
                             this.initializeAllSelects(this.$el);
                         });
                     } else {
-                        alert('This Work Type has no Work Items with AHS data to import.');
+                        // Updated alert message
+                        alert('This Work Type has no direct AHS links and no child Work Items with AHS data to import.');
                     }
                 },
+                // ==================================================================
+                // --- END OF REPLACED FUNCTION ---
+                // ==================================================================
 
                 // FIX 2: NEW function to add a Work Item from the library
                 addWorkItemFromLibrary(workItemId, targetArray) {
@@ -401,12 +430,13 @@
                 
                 linkAHS(item, event) {
                     const selectedId = event.target.value;
+                    // Use the original ahsLibraryData (this.ahsData)
                     if (selectedId && this.ahsData[selectedId]) {
                         const ahsData = this.ahsData[selectedId];
                         item.description = ahsData.name;
                         item.item_code = ahsData.code;
-                        item.uom = ahsData.unit;
-                        item.unit_price = parseFloat(ahsData.cost) || 0;
+                        item.uom = ahsData.uom; // Fixed: use 'uom' field from ahsData
+                        item.unit_price = parseFloat(ahsData.unit_price) || 0; // Fixed: use 'unit_price'
                         item.unit_rate_analysis_id = selectedId;
                     } else {
                         item.description = '';

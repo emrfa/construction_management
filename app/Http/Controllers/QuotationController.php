@@ -44,8 +44,9 @@ class QuotationController extends Controller
         $ahsLibrary = UnitRateAnalysis::orderBy('name')->get();
 
         // 3. For the new "Pull Work Type" dropdown (with full recipe)
-        $workTypesLibrary_json = WorkType::with([
-            'workItems.unitRateAnalyses' // Eager load the full recipe
+       $workTypesLibrary_json = WorkType::with([
+            'workItems.unitRateAnalyses', // For "Group" types
+            'unitRateAnalyses'            // For direct "Task" types
         ])->orderBy('name')->get();
         
         // 4. For the new "Pull Work Item" dropdown (with AHS details)
