@@ -17,6 +17,8 @@ use App\Http\Controllers\UnitRateAnalysisController;
 use App\Http\Controllers\MaterialRequestController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\EquipmentController;
+use App\Http\Controllers\WorkTypeController;
+use App\Http\Controllers\WorkItemController;
 
 
 use Illuminate\Support\Facades\Route;
@@ -103,6 +105,12 @@ Route::middleware('auth')->group(function () {
 
     // Equipment
     Route::resource('equipment', EquipmentController::class);
+
+    // Work Library - Types
+    Route::resource('work-types', WorkTypeController::class);
+
+    // Work Library - Items
+    Route::resource('work-items', WorkItemController::class);
 
 });
 

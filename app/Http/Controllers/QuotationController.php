@@ -7,6 +7,8 @@ use App\Models\Client;
 use App\Models\QuotationItem;
 use App\Models\Project;
 use App\Models\UnitRateAnalysis;
+use App\Models\WorkItem;
+use App\Models\WorkType;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,9 +37,36 @@ class QuotationController extends Controller
      */
     public function create()
     {
+       // 1. For the Client dropdown
         $clients = Client::orderBy('name')->get();
-        $ahsLibrary = UnitRateAnalysis::orderBy('code')->get(); 
-        return view('quotations.create', compact('clients', 'ahsLibrary')); 
+        
+        // 2. For the manual AHS select dropdowns
+        $ahsLibrary = UnitRateAnalysis::orderBy('name')->get();
+
+        // 3. For the new "Pull Work Type" dropdown (with full recipe)
+        $workTypesLibrary_json = WorkType::with([
+            'workItems.unitRateAnalyses' // Eager load the full recipe
+        ])->orderBy('name')->get();
+        
+        // 4. For the Alpine 'linkAHS' function
+        $ahsJsonData = $ahsLibrary->mapWithKeys(fn($ahs) => [$ahs->id => [
+            'code' => $ahs->code,
+            'name' => $ahs->name,
+            'unit' => $ahs->unit,
+            'cost' => $ahs->total_cost
+        ]]);
+        
+        // 5. For repopulating the form on a validation error
+        $oldItemsArray = old('items_json') ? json_decode(old('items_json'), true) : [];
+
+        // 6. Pass all data to the view
+        return view('quotations.create', [
+            'clients' => $clients,
+            'ahsLibrary' => $ahsLibrary,
+            'ahsJsonData' => $ahsJsonData,
+            'workTypesLibrary_json' => $workTypesLibrary_json,
+            'oldItemsArray' => $oldItemsArray,
+        ]);
     }
 
     /**
