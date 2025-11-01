@@ -28,6 +28,12 @@ class Equipment extends Model
         'notes',
     ];
 
+    protected $casts = [
+        'purchase_date' => 'datetime',
+        'rental_start_date' => 'datetime',
+        'rental_end_date' => 'datetime',
+    ];
+
     public function supplier()
     {
         return $this->belongsTo(Supplier::class);

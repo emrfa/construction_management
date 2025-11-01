@@ -21,6 +21,11 @@ class MaterialRequest extends Model
         'notes',
     ];
 
+    protected $casts = [
+        'request_date' => 'datetime',
+        'required_date' => 'datetime',
+    ];
+
     // Relationship to the Project
     public function project()
     {

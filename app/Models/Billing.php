@@ -19,6 +19,10 @@ class Billing extends Model
         'notes',
     ];
 
+    protected $casts = [
+        'billing_date' => 'datetime',
+    ];
+
     // A Billing belongs to one Project
     public function project()
     {

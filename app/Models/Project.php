@@ -25,6 +25,12 @@ class Project extends Model
         'total_budget',
     ];
 
+    protected $casts = [
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
+        'actual_end_date' => 'datetime',
+    ];
+
     // A Project belongs to one Quotation
     public function quotation()
     {

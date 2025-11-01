@@ -21,6 +21,11 @@ class PurchaseOrder extends Model
         'total_amount',
     ];
 
+    protected $casts = [
+        'order_date' => 'datetime',
+        'expected_delivery_date' => 'datetime',
+    ];
+
     public function supplier()
     {
         return $this->belongsTo(Supplier::class);

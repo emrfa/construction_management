@@ -19,6 +19,10 @@ class Quotation extends Model
         'total_estimate',
     ];
 
+    protected $casts = [
+        'date' => 'datetime',
+    ];
+
     public function client()
     {
         return $this->belongsTo(Client::class);

@@ -22,6 +22,11 @@ class Invoice extends Model
         'due_date',
     ];
 
+    protected $casts = [
+        'issued_date' => 'datetime',
+        'due_date' => 'datetime',
+    ];
+
     // An Invoice belongs to one Billing record
     public function billing()
     {

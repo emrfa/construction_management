@@ -272,9 +272,6 @@
                     }
                 },
 
-                // ==================================================================
-                // --- THIS IS THE FULLY REPLACED AND CORRECTED FUNCTION ---
-                // ==================================================================
                 addWorkType(workTypeId, targetArray) {
                     if (!workTypeId) return;
                     const workType = this.library.workTypes.find(wt => wt.id == workTypeId);
@@ -336,9 +333,6 @@
                         alert('This Work Type has no direct AHS links and no child Work Items with AHS data to import.');
                     }
                 },
-                // ==================================================================
-                // --- END OF REPLACED FUNCTION ---
-                // ==================================================================
 
                 // FIX 2: NEW function to add a Work Item from the library
                 addWorkItemFromLibrary(workItemId, targetArray) {

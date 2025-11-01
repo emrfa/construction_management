@@ -135,8 +135,8 @@ class ReportController extends Controller
         $today = Carbon::today();
 
         // --- 2. DEFINE PROJECT TIME PERIOD ---
-        $projectStartDate = $project->start_date ? Carbon::parse($project->start_date) : $tasks->min('planned_start');
-        $projectEndDate = $project->end_date ? Carbon::parse($project->end_date) : $tasks->max('planned_end');
+        $projectStartDate = $project->start_date ? $project->start_date : $tasks->min('planned_start');
+        $projectEndDate = $project->end_date ? $project->end_date : $tasks->max('planned_end');
 
         if (!$projectStartDate || !$projectEndDate) {
             return back()->with('error', 'Cannot generate S-Curve. Please set Project Start/End dates or schedule tasks in the Project Scheduler.');
@@ -151,15 +151,21 @@ class ReportController extends Controller
         } elseif ($totalDurationInDays > 540) { // ~1.5 years or more
             $intervalSpec = '1 month';
         }
-       
-        $periodObject = CarbonPeriod::create($projectStartDate, $intervalSpec, $projectEndDate);
+        // Else, it stays '1 week' (for durations between ~3 months and 1.5 years)
+        // --- END NEW: Smart Interval Logic ---
 
+
+        // --- MODIFIED: Create the period.
+        $periodObject = CarbonPeriod::create($projectStartDate, $intervalSpec, $projectEndDate);
+        
+        // --- THIS IS THE FIX ---
         $period = $periodObject->toArray(); // Convert to array
         $lastPeriodDate = end($period);
         if ($lastPeriodDate && !$lastPeriodDate->isSameDay($projectEndDate)) {
             // Add the true project end date to the loop to ensure 100% is reached
             $period[] = $projectEndDate;
         }
+        // --- END FIX ---
 
 
         // --- 3. CALCULATE CUMULATIVE S-CURVE DATA ---
@@ -209,7 +215,8 @@ class ReportController extends Controller
                 $dailyCost = $materialCost + $laborCost;
                 if ($dailyCost == 0) continue;
 
-                $acDate = $update->date;
+                // --- FIX 1: Convert the Carbon object to a string key ---
+                $acDate = $update->date->format('Y-m-d');
 
                 // Add to overall project AC
                 $actualCostsByDate[$acDate] = ($actualCostsByDate[$acDate] ?? 0) + $dailyCost;
@@ -227,7 +234,7 @@ class ReportController extends Controller
         $cumulativeEV_Percent = 0;
 
         // Main loop over the calculated time period
-        foreach ($period as $date) {
+        foreach ($period as $date) { // $period is now the corrected array
             $currentDate = $date->copy();
             $chartLabels[] = $currentDate->format('d-M-y'); // This is your new "week_labels"
 
@@ -247,8 +254,8 @@ class ReportController extends Controller
             // --- Calculate PV and EV for each task ---
             foreach ($tasks as $task) {
                 $taskWeight = $taskDetails[$task->id]['weight'];
-                $planned_start = $task->planned_start ? Carbon::parse($task->planned_start) : null;
-                $planned_end = $task->planned_end ? Carbon::parse($task->planned_end) : null;
+                $planned_start = $task->planned_start ? $task->planned_start : null;
+                $planned_end = $task->planned_end ? $task->planned_end : null;
                 $currentPeriodPlannedWeight = 0;
                 $currentPeriodActualWeight = 0;
 
@@ -287,6 +294,7 @@ class ReportController extends Controller
 
                 $taskAcDates = collect($taskData['actual_costs_by_date']);
                 foreach ($taskAcDates as $acDate => $cost) {
+                    // --- FIX 2: Check the parsed date string ---
                     if (Carbon::parse($acDate) <= $currentDate) {
                         $periodTaskAC += $cost;
                         $taskAcDates->forget($acDate); 

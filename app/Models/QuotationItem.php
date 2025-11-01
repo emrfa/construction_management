@@ -22,6 +22,11 @@ class QuotationItem extends Model
         'sort_order',
     ];
 
+    protected $casts = [
+        'planned_start' => 'datetime',
+        'planned_end' => 'datetime',
+    ];
+
     // ... quotation() relationship is here ...
     public function quotation()
     {

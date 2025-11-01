@@ -19,6 +19,10 @@ class ProgressUpdate extends Model
         'notes',
     ];
 
+    protected $casts = [
+        'date' => 'datetime',
+    ];
+
     // An update belongs to one task
     public function quotationItem()
     {
