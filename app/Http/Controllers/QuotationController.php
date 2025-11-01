@@ -48,7 +48,10 @@ class QuotationController extends Controller
             'workItems.unitRateAnalyses' // Eager load the full recipe
         ])->orderBy('name')->get();
         
-        // 4. For the Alpine 'linkAHS' function
+        // 4. For the new "Pull Work Item" dropdown (with AHS details)
+        $workItemsLibrary_json = \App\Models\WorkItem::with('unitRateAnalyses')->orderBy('name')->get();
+        
+        // 5. For the Alpine 'linkAHS' function
         $ahsJsonData = $ahsLibrary->mapWithKeys(fn($ahs) => [$ahs->id => [
             'code' => $ahs->code,
             'name' => $ahs->name,
@@ -56,16 +59,17 @@ class QuotationController extends Controller
             'cost' => $ahs->total_cost
         ]]);
         
-        // 5. For repopulating the form on a validation error
+        // 6. For repopulating the form on a validation error
         $oldItemsArray = old('items_json') ? json_decode(old('items_json'), true) : [];
 
-        // 6. Pass all data to the view
+        // 7. Pass all data to the view
         return view('quotations.create', [
             'clients' => $clients,
             'ahsLibrary' => $ahsLibrary,
             'ahsJsonData' => $ahsJsonData,
             'workTypesLibrary_json' => $workTypesLibrary_json,
             'oldItemsArray' => $oldItemsArray,
+            'workItemsLibrary_json' => $workItemsLibrary_json
         ]);
     }
 
