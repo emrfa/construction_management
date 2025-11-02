@@ -34,7 +34,7 @@
                         </ul>
                     </div>
 
-                    <form method="POST" action="{{ route('inventory-items.import') }}" enctype="multipart/form-data">
+                    <form method="POST" action="{{ route('inventory-items.import.analyze') }}" enctype="multipart/form-data">
                         @csrf
                         
                         <div>
@@ -48,7 +48,8 @@
                                 {{ __('Cancel') }}
                             </a>
                             <x-primary-button>
-                                {{ __('Import Items') }}
+                                {{-- Changed button text --}}
+                                {{ __('Analyze and Import File') }}
                             </x-primary-button>
                         </div>
                     </form>

@@ -57,8 +57,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/progress/{quotation_item}/history', [ProgressUpdateController::class, 'history'])->name('progress.history');
 
     // Inventory Management
+    // Inventory Import Step 1 (Show Form)
     Route::get('inventory-items/import', [\App\Http\Controllers\InventoryItemController::class, 'showImportForm'])->name('inventory-items.importForm');
-    Route::post('inventory-items/import', [\App\Http\Controllers\InventoryItemController::class, 'processImport'])->name('inventory-items.import');
+    // Inventory Import Step 2 (Analyze File)
+    Route::post('inventory-items/import/analyze', [\App\Http\Controllers\InventoryItemController::class, 'analyzeImport'])->name('inventory-items.import.analyze');
+    // Inventory Import Step 3 (Show Confirmation)
+    Route::get('inventory-items/import/confirm', [\App\Http\Controllers\InventoryItemController::class, 'showConfirmForm'])->name('inventory-items.import.confirm');
+    // Inventory Import Step 4 (Process File)
+    Route::post('inventory-items/import/process', [\App\Http\Controllers\InventoryItemController::class, 'processImport'])->name('inventory-items.import.process');
     Route::get('inventory-items/export', [\App\Http\Controllers\InventoryItemController::class, 'export'])->name('inventory-items.export');
 
     Route::resource('inventory-items', InventoryItemController::class);
@@ -93,8 +99,14 @@ Route::middleware('auth')->group(function () {
     Route::resource('labor-rates', LaborRateController::class);
 
     // AHS
+    // AHS Import Step 1 (Show Form)
     Route::get('ahs-library/import', [\App\Http\Controllers\UnitRateAnalysisController::class, 'showImportForm'])->name('ahs-library.importForm');
-    Route::post('ahs-library/import', [\App\Http\Controllers\UnitRateAnalysisController::class, 'processImport'])->name('ahs-library.import');
+    // AHS Import Step 2 (Analyze File)
+    Route::post('ahs-library/import/analyze', [\App\Http\Controllers\UnitRateAnalysisController::class, 'analyzeImport'])->name('ahs-library.import.analyze');
+    // AHS Import Step 3 (Show Confirmation)
+    Route::get('ahs-library/import/confirm', [\App\Http\Controllers\UnitRateAnalysisController::class, 'showConfirmForm'])->name('ahs-library.import.confirm');
+    // AHS Import Step 4 (Process File)
+    Route::post('ahs-library/import/process', [\App\Http\Controllers\UnitRateAnalysisController::class, 'processImport'])->name('ahs-library.import.process');
     Route::get('ahs-library/export', [\App\Http\Controllers\UnitRateAnalysisController::class, 'export'])->name('ahs-library.export');
     Route::resource('ahs-library', UnitRateAnalysisController::class);
 

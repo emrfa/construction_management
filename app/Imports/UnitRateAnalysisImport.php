@@ -17,11 +17,11 @@ class UnitRateAnalysisImport implements ToCollection, WithHeadingRow, WithValida
     private $inventoryItems;
     private $laborRates;
     private $currentAhs; // To store the AHS we are processing
+    private $fixMap;
 
-    public function __construct()
+    public function __construct(array $fixMap = [])
     {
-        // Cache all items/rates by NAME to avoid N+1 queries
-        // We use strtolower to make matching case-insensitive
+        $this->fixMap = $fixMap;
         $this->inventoryItems = InventoryItem::all()->pluck('id', function($item) {
             return strtolower($item->item_name);
         });
@@ -37,15 +37,10 @@ class UnitRateAnalysisImport implements ToCollection, WithHeadingRow, WithValida
         try {
             foreach ($rows as $row) 
             {
-                // Is this a new AHS header row?
                 if (!empty($row['ahs_code'])) {
-                    
-                    // If we were processing an AHS, recalculate it before moving on
                     if ($this->currentAhs) {
                         $this->currentAhs->recalculateTotalCost();
                     }
-
-                    // 1. Find or create the new AHS Header
                     $this->currentAhs = UnitRateAnalysis::updateOrCreate(
                         ['code' => $row['ahs_code']],
                         [
@@ -54,18 +49,24 @@ class UnitRateAnalysisImport implements ToCollection, WithHeadingRow, WithValida
                             'overhead_profit_percentage' => $row['ahs_overhead_profit_percentage'] ?? 0,
                         ]
                     );
-
-                    // 2. Clear out all old components to prepare for new ones
                     $this->currentAhs->materials()->delete();
                     $this->currentAhs->labors()->delete();
 
                 } 
-                // Is this a component row for the current AHS?
                 else if ($this->currentAhs && !empty($row['component_type'])) {
                     
+                    $originalName = strtolower($row['component_name_used_for_match']);
+                    
+                    // --- APPLY THE FIX MAP ---
+                    $resolvedName = $this->fixMap[$originalName] ?? $originalName;
+                    
+                    // Skip this row if user told us to
+                    if ($resolvedName === 'skip') {
+                        continue;
+                    }
+
                     if ($row['component_type'] == 'Material') {
-                        // 3. Find the material ID by its NAME (case-insensitive)
-                        $materialId = $this->inventoryItems->get(strtolower($row['component_name_used_for_match']));
+                        $materialId = $this->inventoryItems->get($resolvedName);
                         if ($materialId) {
                             $this->currentAhs->materials()->create([
                                 'inventory_item_id' => $materialId,
@@ -75,21 +76,18 @@ class UnitRateAnalysisImport implements ToCollection, WithHeadingRow, WithValida
                         }
                     } 
                     else if ($row['component_type'] == 'Labor') {
-                        // 4. Find the labor ID by its NAME (type) (case-insensitive)
-                        $laborId = $this->laborRates->get(strtolower($row['component_name_used_for_match']));
+                        $laborId = $this->laborRates->get($resolvedName);
                         if ($laborId) {
                             $this->currentAhs->labors()->create([
                                 'labor_rate_id' => $laborId,
                                 'coefficient' => $row['coefficient'],
-                                'rate' => $row['component_unit_cost'], // Map 'unit_cost' to 'rate'
+                                'rate' => $row['component_unit_cost'],
                             ]);
                         }
                     }
                 }
-                // Otherwise, it's a blank row, so we ignore it
             }
 
-            // 5. Recalculate the very last AHS item in the file
             if ($this->currentAhs) {
                 $this->currentAhs->recalculateTotalCost();
             }
@@ -120,17 +118,28 @@ class UnitRateAnalysisImport implements ToCollection, WithHeadingRow, WithValida
                 'nullable',
                 'string',
                 function ($attribute, $value, $fail) {
-                    if (empty($value)) return; // Ignore if blank
+                    if (empty($value)) return;
+                    $row = request()->all(); 
+                    if (empty($row['component_type'])) return;
+                    
+                    $nameLower = strtolower($value);
 
-                    $row = request()->all(); // This is not ideal, but works for validation
-                    if (!isset($row['component_type'])) return; // Not a component row
-
-                    $valueLower = strtolower($value); // Use case-insensitive matching
-                    if ($row['component_type'] == 'Material' && !$this->inventoryItems->has($valueLower)) {
-                        $fail("The material name '$value' was not found in the Item Master.");
+                    // --- CHECK THE FIX MAP ---
+                    // If the name is in our fix map, it's already resolved.
+                    if (isset($this->fixMap[$nameLower])) {
+                        if ($this->fixMap[$nameLower] === 'skip') {
+                            return; // User wants to skip this, so don't fail
+                        }
+                        // Use the corrected name for validation
+                        $nameLower = $this->fixMap[$nameLower];
                     }
-                    if ($row['component_type'] == 'Labor' && !$this->laborRates->has($valueLower)) {
-                        $fail("The labor type '$value' was not found in Labor Rates.");
+
+                    // Now validate with the (potentially corrected) name
+                    if ($row['component_type'] == 'Material' && !$this->inventoryItems->has($nameLower)) {
+                        $fail("The material name '$value' was not found or resolved.");
+                    }
+                    if ($row['component_type'] == 'Labor' && !$this->laborRates->has($nameLower)) {
+                        $fail("The labor type '$value' was not found or resolved.");
                     }
                 },
             ],

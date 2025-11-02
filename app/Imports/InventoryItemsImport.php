@@ -13,12 +13,15 @@ use Maatwebsite\Excel\Concerns\WithBatchInserts;
 class InventoryItemsImport implements ToCollection, WithHeadingRow, WithValidation, WithBatchInserts
 {
     private $categories;
+    private $fixMap; // <-- ADD THIS
 
-    public function __construct()
+    // --- MODIFIED CONSTRUCTOR ---
+    public function __construct(array $fixMap = [])
     {
-        // 1. We cache all categories in a collection (key=name, value=id)
-        // This avoids hitting the database for every single row (N+1 problem).
-        $this->categories = ItemCategory::all()->pluck('id', 'name');
+        $this->fixMap = $fixMap;
+        $this->categories = ItemCategory::all()->pluck('id', function($category) {
+            return strtolower($category->name);
+        });
     }
 
     /**
@@ -28,30 +31,47 @@ class InventoryItemsImport implements ToCollection, WithHeadingRow, WithValidati
     {
         foreach ($rows as $row) 
         {
-            // 2. Look up the category_id from the name in the Excel file
-            $categoryId = $this->categories->get($row['category_name']);
+            $categoryName = $row['category_name'];
+            $categoryNameLower = strtolower($categoryName);
+            
+            // --- THIS IS THE NEW LOGIC ---
+            // 1. Check if this category was a problem
+            $resolvedName = $this->fixMap[$categoryNameLower] ?? $categoryNameLower;
 
-            // 3. We use updateOrCreate.
-            // If an item_code in the file matches one in the DB, it updates it.
-            // If it's a new item_code, it creates it.
+            // 2. User said to skip rows with this category
+            if ($resolvedName === 'skip') {
+                continue;
+            }
+
+            // 3. Find the category ID using the resolved name
+            $categoryId = $this->categories->get($resolvedName);
+            
+            // 4. If we still don't have an ID (because it was just created),
+            //    we must re-fetch it from the database.
+            if (!$categoryId) {
+                 $newCategory = ItemCategory::where(DB::raw('LOWER(name)'), $resolvedName)->first();
+                 if ($newCategory) {
+                     $categoryId = $newCategory->id;
+                     // Add to our cache for the next row
+                     $this->categories->put($resolvedName, $categoryId);
+                 } else {
+                     continue; // Should not happen, but a good safeguard
+                 }
+            }
+
+            // 5. We use updateOrCreate.
             InventoryItem::updateOrCreate(
                 [
-                    // Column to match on
                     'item_code' => $row['item_code']
                 ],
                 [
-                    // Data to update or create
                     'item_name'           => $row['item_name'],
-                    'category_id'         => $categoryId,
+                    'category_id'         => $categoryId, // Use the resolved ID
                     'uom'                 => $row['uom'],
                     'base_purchase_price' => $row['base_purchase_price'] ?? 0,
                     'reorder_level'       => $row['reorder_level'] ?? 0,
                 ]
             );
-
-            // Note: If 'item_code' is blank, updateOrCreate treats it as a 'create'.
-            // The boot() method in your InventoryItem model will then
-            // auto-generate a new code. This is exactly what we want.
         }
     }
 
@@ -63,16 +83,28 @@ class InventoryItemsImport implements ToCollection, WithHeadingRow, WithValidati
         return [
             'item_code' => 'nullable|string|max:255',
             'item_name' => 'required|string|max:255',
-            'category_name' => 'required|string|exists:item_categories,name', // Force valid category names
+            'category_name' => [
+                'required',
+                'string',
+                'max:255',
+                function ($attribute, $value, $fail) {
+                    $nameLower = strtolower($value);
+                    
+                    // Check if the name is in our fix map or already exists
+                    if (isset($this->fixMap[$nameLower]) || $this->categories->has($nameLower)) {
+                        return; // This name is valid or has been resolved
+                    }
+                    
+                    // If we're here, it's an unresolved problem
+                    $fail("The category '$value' was not found and was not resolved.");
+                }
+            ],
             'uom' => 'required|string|max:50',
             'base_purchase_price' => 'nullable|numeric|min:0',
             'reorder_level' => 'nullable|numeric|min:0',
         ];
     }
 
-    /**
-     * This improves performance by importing in batches.
-     */
     public function batchSize(): int
     {
         return 100;

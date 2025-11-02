@@ -6,10 +6,15 @@ use App\Models\InventoryItem;
 use App\Models\ItemCategory;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 use App\Exports\InventoryItemsExport;
 use App\Imports\InventoryItemsImport;
 use Maatwebsite\Excel\Facades\Excel;
+
+
+use Illuminate\Support\Str;
+use Maatwebsite\Excel\HeadingRowImport;
 
 class InventoryItemController extends Controller
 {
@@ -138,9 +143,16 @@ class InventoryItemController extends Controller
         }
     }
 
-    public function export()
+    public function export(Request $request)
     {
-        return Excel::download(new InventoryItemsExport, 'inventory_items.xlsx');
+        // Validate that selected_ids, if present, is an array
+        $request->validate([
+            'selected_ids' => 'nullable|array'
+        ]);
+
+        $ids = $request->input('selected_ids', null);
+
+        return Excel::download(new InventoryItemsExport($ids), 'inventory_items.xlsx');
     }
 
     public function showImportForm()
@@ -148,14 +160,144 @@ class InventoryItemController extends Controller
         return view('inventory-items.import');
     }
 
-    public function processImport(Request $request)
+    /**
+     * STEP 1: Analyze the uploaded file for problems.
+     */
+    public function analyzeImport(Request $request)
     {
         $request->validate([
             'file' => 'required|mimes:xlsx,xls,csv',
         ]);
 
+        // 1. Store the file temporarily
+        $path = $request->file('file')->store('temp_imports');
+        $request->session()->put('import_file_path', $path);
+
+        // 2. Read all rows from the file as a plain array
         try {
-            Excel::import(new InventoryItemsImport, $request->file('file'));
+            $allRows = Excel::toArray(new \stdClass(), $path)[0]; // [0] gets the first sheet
+        } catch (\Exception $e) {
+            return back()->with('error', 'Could not read the file. Error: ' . $e->getMessage());
+        }
+
+        // 3. Get the heading row (and remove it from $allRows)
+        $headings = array_map('trim', array_shift($allRows));
+
+        // 4. Find missing categories
+        $existingCategories = ItemCategory::pluck('name')->map('strtolower');
+
+        $problemRows = collect();
+        
+        // Loop through the *data rows*
+        foreach ($allRows as $index => $rowArray) {
+            $row = [];
+            foreach ($headings as $i => $heading) {
+                $row[$heading] = $rowArray[$i] ?? null;
+            }
+            
+            $categoryName = $row['category_name'] ?? null;
+
+            if (empty($categoryName)) {
+                continue; // Skip rows without a category
+            }
+            
+            $nameLower = strtolower($categoryName);
+
+            // Check if this name is a problem
+            if (!$existingCategories->contains($nameLower)) {
+                $problemRows->push(['name' => $categoryName]);
+            }
+        }
+
+        $uniqueProblems = $problemRows->unique('name');
+
+        // If no problems, just process it immediately
+        if ($uniqueProblems->isEmpty()) {
+            return $this->processImport($request);
+        }
+
+        // We have problems, so let's find suggestions
+        $problemsWithSuggestions = [];
+        foreach ($uniqueProblems as $problem) {
+            $suggestions = [];
+
+            // Find "Did you mean?"
+            foreach ($existingCategories as $existingName) {
+                similar_text(strtolower($problem['name']), $existingName, $percent);
+                if ($percent >= 75) { // 75% match or higher
+                    // Find the original case-sensitive name to suggest
+                    $originalName = ItemCategory::where(DB::raw('LOWER(name)'), $existingName)->value('name');
+                    $suggestions[] = $originalName;
+                }
+            }
+            
+            $problem['suggestions'] = array_unique($suggestions);
+            $problemsWithSuggestions[] = $problem;
+        }
+
+        // Store problems in session and redirect to confirmation
+        $request->session()->put('import_problems', $problemsWithSuggestions);
+        return redirect()->route('inventory-items.import.confirm');
+    }
+
+    /**
+     * STEP 2: Show the confirmation page with problems.
+     */
+    public function showConfirmForm(Request $request)
+    {
+        $problems = $request->session()->get('import_problems');
+        $filePath = $request->session()->get('import_file_path');
+
+        if (!$problems || !$filePath) {
+            return redirect()->route('inventory-items.importForm')->with('error', 'No import data found. Please upload a file again.');
+        }
+
+        return view('inventory-items.import-confirm', [
+            'problems' => $problems
+        ]);
+    }
+
+    /**
+     * STEP 3: Process the import with user's resolutions.
+     * (This REPLACES your old processImport method)
+     */
+    public function processImport(Request $request)
+    {
+        $filePath = $request->session()->get('import_file_path');
+        if (!$filePath) {
+            return redirect()->route('inventory-items.importForm')->with('error', 'Your session expired. Please upload the file again.');
+        }
+
+        $resolutions = $request->input('resolutions', []);
+        
+        $fixMap = []; // This will map "Typo Name" -> "Correct Name"
+        
+        // --- THIS IS THE NEW LOGIC ---
+        // First, create any new categories the user approved
+        foreach ($resolutions as $problemName => $action) {
+            if ($action === 'create_new') {
+                // Create the new category. The model's boot() method will make the prefix.
+                $newCategory = ItemCategory::create(['name' => $problemName]);
+                // Add it to our "fix map" so the importer knows what to do
+                $fixMap[strtolower($problemName)] = strtolower($newCategory->name);
+            }
+            // Add "Did you mean?" fixes to the map
+            elseif (Str::startsWith($action, 'Use: ')) {
+                $fixMap[strtolower($problemName)] = strtolower(Str::after($action, 'Use: '));
+            }
+            // Add "skip" to the map
+            elseif ($action === 'skip') {
+                $fixMap[strtolower($problemName)] = 'skip';
+            }
+        }
+        // --- END NEW LOGIC ---
+
+        try {
+            // Pass the fix map to the import class
+            Excel::import(new InventoryItemsImport($fixMap), $filePath);
+            
+            // Clean up session
+            $request->session()->forget(['import_file_path', 'import_problems']);
             
             return redirect()->route('inventory-items.index')
                              ->with('success', 'Items imported successfully.');
@@ -164,7 +306,9 @@ class InventoryItemController extends Controller
              $failures = $e->failures();
              $errorMessages = [];
              foreach ($failures as $failure) {
-                 $errorMessages[] = 'Row ' . $failure->row() . ': ' . implode(', ', $failure->errors()) . ' (Value: ' . $failure->values()[$failure->attribute()] . ')';
+                 $attribute = $failure->attribute();
+                 $value = $failure->values()[$attribute] ?? '[Not Available]';
+                 $errorMessages[] = 'Row ' . $failure->row() . ': ' . implode(', ', $failure->errors()) . ' (Attribute: ' . $attribute . ', Value: ' . $value . ')';
              }
              return back()->with('error', 'Error during import: <br>' . implode('<br>', $errorMessages));
         } catch (\Exception $e) {

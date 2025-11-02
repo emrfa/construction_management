@@ -1,16 +1,26 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
+        <div class="flex justify-between items-center" x-data="selectionHandler">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 {{ __('Inventory Item Master') }}
             </h2>
+            
             <div class="flex space-x-2">
-
                 <a href="{{ route('inventory-items.importForm') }}" class="inline-flex items-center px-4 py-2 bg-yellow-500 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-yellow-600">
-                        {{ __('Import') }}
+                    {{ __('Import') }}
                 </a>
-                <a href="{{ route('inventory-items.export') }}" class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700">
-                    {{ __('Export') }}
+
+                <a href="#" 
+                   x-show="selected.length > 0"
+                   x-bind:href="`{{ route('inventory-items.export') }}?${ selected.map(id => `selected_ids[]=${id}`).join('&') }`"
+                   class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700">
+                    Export Selected (<span x-text="selected.length"></span>)
+                </a>
+
+                <a href="{{ route('inventory-items.export') }}" 
+                   x-show="selected.length === 0"
+                   class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700">
+                    {{ __('Export All') }}
                 </a>
                 
                 <a href="{{ route('inventory-items.create') }}" class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700">
@@ -23,8 +33,8 @@
         </div>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8"> {{-- Changed to max-w-7xl for a wider table --}}
+    <div class="py-12" x-data="selectionHandler">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 space-y-6">
                     
@@ -34,8 +44,8 @@
                         </div>
                     @endif
                     @if(session('error'))
-                        <div class="mb-4 p-4 bg-red-100 border border-red-300 text-red-800 rounded-md">
-                            {{ session('error') }}
+                         <div class="mb-4 p-4 bg-red-100 border border-red-300 text-red-800 rounded-md">
+                            {!! session('error') !!}
                         </div>
                     @endif
 
@@ -68,10 +78,17 @@
                             </div>
                         </div>
                     </form>
+
                     <div class="overflow-x-auto border rounded-md">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-100">
                                 <tr>
+                                    <th class="p-3 w-4">
+                                        <input type="checkbox" 
+                                               @click="toggleAll()"
+                                               :checked="allSelected()"
+                                               class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                                    </th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Code</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
@@ -84,6 +101,10 @@
                             <tbody class="bg-white divide-y divide-gray-200">
                                 @forelse ($items as $item)
                                     <tr class="hover:bg-gray-50 transition duration-150">
+                                        <td class="p-3">
+                                            <input type="checkbox" x-model="selected" value="{{ $item->id }}"
+                                                   class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                                        </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {{ $item->item_code }}
                                         </td>
@@ -117,11 +138,11 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                        <td colspan="8" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
                                             No items found matching your search.
                                         </td>
                                     </tr>
-                                @endforelse
+                                @endForelse
                             </tbody>
                         </table>
                     </div>
@@ -137,6 +158,24 @@
 
     @push('scripts')
     <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('selectionHandler', () => ({
+                selected: [],
+                allIds: @json($items->pluck('id')),
+                
+                toggleAll() {
+                    if (this.allSelected()) {
+                        this.selected = [];
+                    } else {
+                        this.selected = Array.from(this.allIds);
+                    }
+                },
+                allSelected() {
+                    return this.selected.length === this.allIds.length && this.allIds.length > 0;
+                }
+            }));
+        });
+
         document.addEventListener('DOMContentLoaded', function() {
             new TomSelect('#select-category', {
                 create: false,

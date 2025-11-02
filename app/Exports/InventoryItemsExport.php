@@ -1,137 +1,73 @@
 <?php
 
-namespace App\Imports;
+namespace App\Exports;
 
-use App\Models\UnitRateAnalysis;
 use App\Models\InventoryItem;
-use App\Models\LaborRate;
-use Illuminate\Support\Collection;
-use Maatwebsite\Excel\Concerns\ToCollection;
-use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Maatwebsite\Excel\Concerns\WithValidation;
-use Maatwebsite\Excel\Concerns\WithBatchInserts;
-use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithMapping;
 
-class UnitRateAnalysisImport implements ToCollection, WithHeadingRow, WithValidation, WithBatchInserts
+class InventoryItemsExport implements FromCollection, WithHeadings, WithMapping
 {
-    private $inventoryItems;
-    private $laborRates;
-    private $currentAhs;
+    protected $ids;
 
-    public function __construct()
+    /**
+    * Pass an optional array of IDs to export only those items.
+    * If no IDs are provided, it exports all.
+    */
+    public function __construct(array $ids = null)
     {
-        // Cache all items/rates by NAME to avoid N+1 queries
-        // This assumes names are unique!
-        $this->inventoryItems = InventoryItem::pluck('id', 'item_name');
-        $this->laborRates = LaborRate::pluck('id', 'labor_type');
-        $this->currentAhs = null;
+        $this->ids = $ids;
     }
 
-    public function collection(Collection $rows)
+    /**
+    * @return \Illuminate\Support\Collection
+    */
+    public function collection()
     {
-        DB::beginTransaction();
-        try {
-            foreach ($rows as $row) 
-            {
-                // Is this a new AHS header row?
-                if (!empty($row['ahs_code'])) {
-                    
-                    // If we were processing an AHS, recalculate it before moving on
-                    if ($this->currentAhs) {
-                        $this->currentAhs->recalculateTotalCost();
-                    }
+        // Start the query
+        $query = InventoryItem::with('itemCategory');
 
-                    // 1. Find or create the new AHS Header
-                    $this->currentAhs = UnitRateAnalysis::updateOrCreate(
-                        ['code' => $row['ahs_code']],
-                        [
-                            'name' => $row['ahs_name'],
-                            'unit' => $row['ahs_unit'],
-                            'overhead_profit_percentage' => $row['ahs_overhead_profit_percentage'] ?? 0,
-                        ]
-                    );
-
-                    // 2. Clear out all old components to prepare for new ones
-                    $this->currentAhs->materials()->delete();
-                    $this->currentAhs->labors()->delete();
-
-                } 
-                // Is this a component row for the current AHS?
-                else if ($this->currentAhs && !empty($row['component_type'])) {
-                    
-                    if ($row['component_type'] == 'Material') {
-                        // 3. Find the material ID by its NAME
-                        $materialId = $this->inventoryItems->get($row['component_name_used_for_match']);
-                        if ($materialId) {
-                            $this->currentAhs->materials()->create([
-                                'inventory_item_id' => $materialId,
-                                'coefficient' => $row['coefficient'],
-                                'unit_cost' => $row['component_unit_cost'],
-                            ]);
-                        }
-                    } 
-                    else if ($row['component_type'] == 'Labor') {
-                        // 4. Find the labor ID by its NAME (type)
-                        $laborId = $this->laborRates->get($row['component_name_used_for_match']);
-                        if ($laborId) {
-                            $this->currentAhs->labors()->create([
-                                'labor_rate_id' => $laborId,
-                                'coefficient' => $row['coefficient'],
-                                'rate' => $row['component_unit_cost'], // Map 'unit_cost' to 'rate'
-                            ]);
-                        }
-                    }
-                }
-                // Otherwise, it's a blank row, so we ignore it
-            }
-
-            // 5. Recalculate the very last AHS item in the file
-            if ($this->currentAhs) {
-                $this->currentAhs->recalculateTotalCost();
-            }
-
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
+        // If IDs were provided, only get those.
+        if ($this->ids) {
+            $query->whereIn('id', $this->ids);
         }
+
+        return $query->get();
     }
 
-    public function rules(): array
+    /**
+    * @return array
+    */
+    public function headings(): array
     {
+        // These are the column headers in the Excel file
         return [
-            // Header rows
-            'ahs_code' => 'nullable|string',
-            'ahs_name' => 'nullable|string',
-            'ahs_unit' => 'nullable|string',
-            'ahs_overhead_profit_percentage' => 'nullable|numeric|min:0',
-
-            // Component rows
-            'component_type' => 'nullable|in:Material,Labor',
-            'coefficient' => 'nullable|numeric|min:0',
-            'component_unit_cost' => 'nullable|numeric|min:0',
-
-            // Validation by NAME
-            'component_name_used_for_match' => [
-                'nullable',
-                'string',
-                function ($attribute, $value, $fail) {
-                    if (empty($value)) return; // Ignore if blank
-
-                    $row = request()->all(); // Get the row data
-                    if ($row['component_type'] == 'Material' && !$this->inventoryItems->has($value)) {
-                        $fail("The material name '$value' was not found in the Item Master.");
-                    }
-                    if ($row['component_type'] == 'Labor' && !$this->laborRates->has($value)) {
-                        $fail("The labor type '$value' was not found in Labor Rates.");
-                    }
-                },
-            ],
+            'item_code',
+            'item_name',
+            'category_name',
+            'uom',
+            'base_purchase_price',
+            'reorder_level',
+            'stock_on_hand',
         ];
     }
 
-    public function batchSize(): int
+    /**
+    * @param mixed $item
+    * @return array
+    */
+    public function map($item): array
     {
-        return 200; // Increase batch size
+        // This maps each item's data to the columns
+        return [
+            $item->item_code,
+            $item->item_name,
+            $item->itemCategory->name ?? 'N/A', // Get name from relationship
+            $item->uom,
+            $item->base_purchase_price,
+            $item->reorder_level,
+            $item->quantity_on_hand, // Access the helper attribute
+        ];
     }
 }
