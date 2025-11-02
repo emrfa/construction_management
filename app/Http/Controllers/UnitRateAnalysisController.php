@@ -8,6 +8,10 @@ use App\Models\LaborRate;
 use App\Models\UnitRateMaterial;
 use App\Models\UnitRateLabor;
 
+use App\Exports\UnitRateAnalysisExport;
+use App\Imports\UnitRateAnalysisImport;
+use Maatwebsite\Excel\Facades\Excel;
+
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -223,5 +227,53 @@ class UnitRateAnalysisController extends Controller
 
         return redirect()->route('ahs-library.index')
                          ->with('success', 'AHS deleted successfully.');
+    }
+
+    public function export(Request $request)
+    {
+        // Validate that selected_ids, if present, is an array
+        $request->validate([
+            'selected_ids' => 'nullable|array'
+        ]);
+
+        $ids = $request->input('selected_ids', null);
+
+        return Excel::download(new UnitRateAnalysisExport($ids), 'ahs_library.xlsx');
+    }
+
+    /**
+     * Show the form for importing AHS items.
+     */
+    public function showImportForm()
+    {
+        return view('ahs-library.import');
+    }
+
+    /**
+     * Handle the import of AHS items.
+     */
+    public function processImport(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls,csv',
+        ]);
+
+        try {
+            Excel::import(new UnitRateAnalysisImport, $request->file('file'));
+            
+            return redirect()->route('ahs-library.index')
+                             ->with('success', 'AHS Library imported successfully.');
+
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+             $failures = $e->failures();
+             $errorMessages = [];
+             foreach ($failures as $failure) {
+                $value = $failure->values()[$attribute] ?? 'N/A';
+                 $errorMessages[] = 'Row ' . $failure->row() . ': ' . implode(', ', $failure->errors()) . ' (Value: ' . $failure->values()[$failure->attribute()] . ')';
+             }
+             return back()->with('error', 'Error during import: <br>' . implode('<br>', $errorMessages));
+        } catch (\Exception $e) {
+            return back()->with('error', 'An unexpected error occurred: ' . $e->getMessage());
+        }
     }
 }

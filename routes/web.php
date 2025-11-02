@@ -20,6 +20,7 @@ use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\WorkTypeController;
 use App\Http\Controllers\WorkItemController;
 use App\Http\Controllers\DashboardController;   
+use App\Http\Controllers\ItemCategoryController;
 
 
 use Illuminate\Support\Facades\Route;
@@ -56,6 +57,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/progress/{quotation_item}/history', [ProgressUpdateController::class, 'history'])->name('progress.history');
 
     // Inventory Management
+    Route::get('inventory-items/import', [\App\Http\Controllers\InventoryItemController::class, 'showImportForm'])->name('inventory-items.importForm');
+    Route::post('inventory-items/import', [\App\Http\Controllers\InventoryItemController::class, 'processImport'])->name('inventory-items.import');
+    Route::get('inventory-items/export', [\App\Http\Controllers\InventoryItemController::class, 'export'])->name('inventory-items.export');
+
     Route::resource('inventory-items', InventoryItemController::class);
 
     // Supplier Management
@@ -88,6 +93,9 @@ Route::middleware('auth')->group(function () {
     Route::resource('labor-rates', LaborRateController::class);
 
     // AHS
+    Route::get('ahs-library/import', [\App\Http\Controllers\UnitRateAnalysisController::class, 'showImportForm'])->name('ahs-library.importForm');
+    Route::post('ahs-library/import', [\App\Http\Controllers\UnitRateAnalysisController::class, 'processImport'])->name('ahs-library.import');
+    Route::get('ahs-library/export', [\App\Http\Controllers\UnitRateAnalysisController::class, 'export'])->name('ahs-library.export');
     Route::resource('ahs-library', UnitRateAnalysisController::class);
 
     // Material Request
@@ -114,6 +122,9 @@ Route::middleware('auth')->group(function () {
     // S Curve (Time Scheduler)
     Route::get('/projects/{project}/scheduler', [ProjectController::class, 'showScheduler'])->name('projects.scheduler');
     Route::post('/projects/{project}/scheduler', [ProjectController::class, 'storeScheduler'])->name('projects.scheduler.store');
+
+    // Item Category Management
+    Route::resource('item-categories', \App\Http\Controllers\ItemCategoryController::class);
 
 });
 
