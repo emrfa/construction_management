@@ -116,7 +116,16 @@
                                         <select x-model="equipment.equipment_id" @change="updateEquipmentCost(index, $event)" :id="`eq_id_${index}`" :name="`equipments[${index}][equipment_id]`" class="tom-select-equipments block mt-1 w-full border-gray-300 text-sm rounded-md shadow-sm" required>
                                             <option value="">Select equipment...</option>
                                             @foreach ($equipments as $eq)
-                                                <option value="{{ $eq->id }}" data-cost="{{ $eq->base_rental_rate ?? 0 }}">{{ $eq->name }} ({{ $eq->base_rental_rate_unit ?? 'unit' }})</option>
+                                                @php
+                                                    // Check status to decide which rate and unit to use
+                                                    $cost = $eq->status == 'rented' ? $eq->rental_rate : $eq->base_rental_rate;
+                                                    $unit = $eq->status == 'rented' ? $eq->rental_rate_unit : $eq->base_rental_rate_unit;
+                                                    
+                                                    // Set defaults if they are empty
+                                                    if (empty($cost)) $cost = 0;
+                                                    if (empty($unit)) $unit = 'unit';
+                                                @endphp
+                                                <option value="{{ $eq->id }}" data-cost="{{ $cost }}">{{ $eq->name }} ({{ $unit }})</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -163,8 +172,11 @@
             // Store master data costs/rates for easy JS lookup
             const inventoryItemData = @json($inventoryItems->mapWithKeys(fn($item) => [$item->id => ['cost' => $item->latest_cost ?? 0]]));
             const laborRatesData = @json($laborRates->mapWithKeys(fn($rate) => [$rate->id => ['rate' => $rate->rate]]));
-            const equipmentData = @json($equipments->mapWithKeys(fn($eq) => [$eq->id => ['cost' => $eq->base_rental_rate ?? 0]]));
-
+            const equipmentData = @json($equipments->mapWithKeys(fn($eq) => [
+                $eq->id => [
+                    'cost' => ($eq->status == 'rented' ? $eq->rental_rate : $eq->base_rental_rate) ?? 0
+                ]
+            ]));
             function ahsForm() {
                 return {
                     materials: [],

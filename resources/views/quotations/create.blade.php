@@ -31,10 +31,6 @@
                                     <input id="project_name" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" type="text" name="project_name" value="{{ old('project_name') }}" required />
                                 </div>
                                 <div>
-                                    <label for="sub_project_name" class="block font-medium text-sm text-gray-700">{{ __('Sub Project (Optional)') }}</label>
-                                    <input id="sub_project_name" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" type="text" name="sub_project_name" value="{{ old('sub_project_name') }}" />
-                                </div>
-                                <div>
                                     <label for="date" class="block font-medium text-sm text-gray-700">{{ __('Date') }}</label>
                                     <input id="date" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" type="date" name="date" value="{{ old('date', date('Y-m-d')) }}" required />
                                 </div>

@@ -25,11 +25,43 @@ class QuotationController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+   public function index(Request $request)
     {
-        $quotations = Quotation::with('client')->latest()->get(); 
+        // Get data for filters
+        $clients = Client::orderBy('name')->get();
+        $statuses = ['draft', 'sent', 'approved', 'rejected'];
 
-        return view('quotations.index', compact('quotations'));
+        // Start query
+        $query = Quotation::with('client')->latest();
+
+        // Apply text search (Quotation # or Project Name)
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('quotation_no', 'like', "%{$search}%")
+                     ->orWhere('project_name', 'like', "%{$search}%");
+        });
+
+        // Apply client filter
+        $query->when($request->client, function ($q, $client_id) {
+            return $q->where('client_id', $client_id);
+        });
+
+        // Apply status filter
+        $query->when($request->status, function ($q, $status) {
+            return $q->where('status', $status);
+        });
+
+        // Apply date range filter
+        $query->when($request->date_from, function ($q, $date_from) {
+            return $q->where('date', '>=', $date_from);
+        });
+        $query->when($request->date_to, function ($q, $date_to) {
+            return $q->where('date', '<=', $date_to);
+        });
+
+        // Paginate results and keep filters on page links
+        $quotations = $query->paginate(15)->appends($request->query());
+
+        return view('quotations.index', compact('quotations', 'clients', 'statuses'));
     }
 
     /**
@@ -288,18 +320,47 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
      */
     public function edit(Quotation $quotation)
     {
-        /// Get all clients for the dropdown
+        // 1. Get all clients for the dropdown
         $clients = Client::orderBy('name')->get();
+        
+        // --- THIS IS THE NEW LOGIC (COPIED FROM 'create') ---
 
-        $ahsLibrary = UnitRateAnalysis::orderBy('code')->get();
-        // Load ALL items as a flat list. Our helper function will build the tree.
-        $quotation->load('allItems'); // <-- FIX: Changed from 'allItems.children'
+        // 2. For the manual AHS select dropdowns
+        $ahsLibrary = UnitRateAnalysis::orderBy('name')->get();
 
-        // We need to re-format the flat "allItems" into the same tree
-        // structure our Alpine component expects.
+        // 3. For the "Pull Work Type" dropdown
+        $workTypesLibrary_json = WorkType::with([
+            'workItems.unitRateAnalyses',
+            'unitRateAnalyses'
+        ])->orderBy('name')->get();
+
+        // 4. For the "Pull Work Item" dropdown
+        $workItemsLibrary_json = \App\Models\WorkItem::with('unitRateAnalyses')->orderBy('name')->get();
+
+        // 5. For the Alpine 'linkAHS' function (THIS FIXES YOUR ERROR)
+        $ahsJsonData = $ahsLibrary->mapWithKeys(fn($ahs) => [$ahs->id => [
+            'code' => $ahs->code,
+            'name' => $ahs->name,
+            'uom' => $ahs->unit,
+            'unit_price' => $ahs->total_cost,
+        ]])->toJson();
+        
+        // --- END OF NEW LOGIC ---
+
+        // 6. Get the existing items for this quotation
+        $quotation->load('allItems');
         $itemsTree = $this->buildItemTree($quotation->allItems);
-
-        return view('quotations.edit', compact('quotation', 'clients', 'itemsTree'));
+        
+        // 7. Pass all data to the view
+        return view('quotations.edit', [
+            'quotation' => $quotation,
+            'clients' => $clients,
+            'ahsLibrary' => $ahsLibrary,
+            'workTypesLibrary_json' => $workTypesLibrary_json,
+            'workItemsLibrary_json' => $workItemsLibrary_json,
+            'ahsJsonData' => $ahsJsonData,
+            'oldItemsArray' => $itemsTree, // Pass the items tree
+        ]);
     }
 
     /**

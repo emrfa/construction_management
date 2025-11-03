@@ -22,22 +22,20 @@
     <body class="font-sans antialiased">
         <div class="min-h-screen bg-gray-100">
 
-            @include('layouts.navigation')
-
             <main>
                 <div class="flex">
 
-                    {{-- === SIDEBAR === --}}
-                    <aside class="w-64 bg-white shadow-md min-h-screen p-4 flex-shrink-0">
+                    <aside class="w-64 bg-white shadow-md min-h-screen p-4 flex-shrink-0 flex flex-col">
                         @php
                         // Define consistent classes for all sidebar links
                         $baseClasses = 'block w-full text-left px-4 py-2 text-sm rounded hover:bg-gray-100 transition duration-150';
                         $activeClasses = 'bg-gray-100 font-semibold text-gray-900';
                         $inactiveClasses = 'text-gray-700 hover:text-gray-900';
-                        $deadLinkClasses = 'text-gray-400 cursor-not-allowed'; // For links pointing to #
+                        $deadLinkClasses = 'text-gray-400 cursor-not-allowed';
                         @endphp
                         
-                        <nav class="space-y-4">
+                        {{-- This nav block will grow to fill the available space --}}
+                        <nav class="space-y-4 flex-grow">
 
                             <div>
                                 <h3 class="text-xs uppercase text-gray-500 font-bold mb-2">Main</h3>
@@ -103,7 +101,6 @@
                                    class="{{ $baseClasses }} {{ request()->routeIs('inventory-items.*') ? $activeClasses : $inactiveClasses }}">
                                     {{ __('Item Master') }}
                                 </a>
-                                {{-- This is the new link we added --}}
                                 <a href="{{ route('item-categories.index') }}" 
                                    class="{{ $baseClasses }} {{ request()->routeIs('item-categories.*') ? $activeClasses : $inactiveClasses }}">
                                     {{ __('Item Categories') }}
@@ -141,19 +138,35 @@
                                 <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}">Project Costing</a>
                                 <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}">Inventory Levels</a>
                             </div>
-
-                            <div>
-                                <h3 class="text-xs uppercase text-gray-500 font-bold mb-2">Settings</h3>
-                                <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}">Users & Roles</a>
-                                <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}">Company Details</a>
-                            </div>
-
                         </nav>
+                        
+                        {{-- === NEW USER MENU (Sticks to the bottom) === --}}
+                        <div class="flex-shrink-0 mt-6 pt-4 border-t border-gray-200">
+                            <div class="px-4 py-2">
+                                <div class="text-sm font-semibold text-gray-900">{{ Auth::user()->name }}</div>
+                                <div class="text-xs text-gray-500">{{ Auth::user()->email }}</div>
+                            </div>
+                            
+                            <a href="{{ route('profile.edit') }}" 
+                               class="{{ $baseClasses }} {{ request()->routeIs('profile.edit') ? $activeClasses : $inactiveClasses }}">
+                                {{ __('My Profile') }}
+                            </a>
+            
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <a href="{{ route('logout') }}"
+                                   class="{{ $baseClasses }} {{ $inactiveClasses }}"
+                                   onclick="event.preventDefault(); this.closest('form').submit();">
+                                    {{ __('Log Out') }}
+                                </a>
+                            </form>
+                        </div>
+                        
                     </aside>
                     
-                    {{-- === MAIN CONTENT === --}}
                     <div class="flex-1">
                         
+                        {{-- The Page Header ($header slot) is now here --}}
                         @if (isset($header))
                             <header class="bg-white shadow">
                                 <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
@@ -170,7 +183,6 @@
             </main>
         </div>
         
-        {{-- Removed duplicate tom-select script --}}
         @stack('scripts')
     </body>
 </html>
