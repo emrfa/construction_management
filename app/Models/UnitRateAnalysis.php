@@ -32,11 +32,11 @@ class UnitRateAnalysis extends Model
 
     public function recalculateTotalCost()
     {
-        $this->loadMissing(['materials', 'labors']);
+        $this->loadMissing(['materials', 'labors', 'equipments']);
 
         $baseMaterialCost = $this->materials()->sum(DB::raw('coefficient * unit_cost'));
         $baseLaborCost = $this->labors()->sum(DB::raw('coefficient * rate'));
-        $baseEquipmentCost = 0; // Add later
+        $baseEquipmentCost = $this->equipments()->sum(DB::raw('coefficient * cost_rate'));
 
         $baseTotalCost = $baseMaterialCost + $baseLaborCost + $baseEquipmentCost;
 
@@ -51,6 +51,11 @@ class UnitRateAnalysis extends Model
     public function quotationItems()
     {
         return $this->hasMany(QuotationItem::class);
+    }
+
+    public function equipments()
+    {
+        return $this->hasMany(UnitRateEquipment::class);
     }
 
 }

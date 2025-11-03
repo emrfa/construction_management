@@ -38,4 +38,12 @@ class Equipment extends Model
     {
         return $this->belongsTo(Supplier::class);
     }
+
+    /**
+     * Get all the AHS line items this equipment is used in.
+     */
+    public function unitRateEquipments()
+    {
+        return $this->hasMany(UnitRateEquipment::class);
+    }
 }

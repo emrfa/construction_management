@@ -7,11 +7,12 @@ use App\Models\InventoryItem;
 use App\Models\LaborRate;
 use App\Models\UnitRateMaterial;
 use App\Models\UnitRateLabor;
+use App\Models\Equipment; 
+use App\Models\UnitRateEquipment; 
 
 use App\Exports\UnitRateAnalysisExport;
 use App\Imports\UnitRateAnalysisImport;
 use Maatwebsite\Excel\Facades\Excel;
-
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\HeadingRowImport;
 
@@ -38,7 +39,8 @@ class UnitRateAnalysisController extends Controller
     {
         $inventoryItems = InventoryItem::orderBy('item_name')->get();
         $laborRates = LaborRate::orderBy('labor_type')->get();
-        return view('ahs-library.create', compact('inventoryItems', 'laborRates'));
+        $equipments = Equipment::orderBy('name')->get();
+        return view('ahs-library.create', compact('inventoryItems', 'laborRates', 'equipments'));
     }
 
     /**
@@ -52,14 +54,21 @@ class UnitRateAnalysisController extends Controller
             'unit' => 'required|string|max:50',
             'overhead_profit_percentage' => 'required|numeric|min:0|max:100',
             'notes' => 'nullable|string',
+
             'materials' => 'nullable|array',
             'materials.*.inventory_item_id' => 'required_with:materials|exists:inventory_items,id',
             'materials.*.coefficient' => 'required_with:materials|numeric|min:0',
             'materials.*.unit_cost' => 'required_with:materials|numeric|min:0',
+
             'labors' => 'nullable|array',
             'labors.*.labor_rate_id' => 'required_with:labors|exists:labor_rates,id',
             'labors.*.coefficient' => 'required_with:labors|numeric|min:0',
             'labors.*.rate' => 'required_with:labors|numeric|min:0',
+
+            'equipments' => 'nullable|array',
+            'equipments.*.equipment_id' => 'required_with:equipments|exists:equipment,id',
+            'equipments.*.coefficient' => 'required_with:equipments|numeric|min:0',
+            'equipments.*.cost_rate' => 'required_with:equipments|numeric|min:0',
         ]);
 
         try {
@@ -101,6 +110,13 @@ class UnitRateAnalysisController extends Controller
                 }
             }
 
+            if ($request->has('equipments')) {
+                foreach ($validatedData['equipments'] as $equip) {
+                    if (empty($equip['equipment_id'])) continue;
+                    $analysis->equipments()->create($equip);
+                }
+            }
+
             // Recalculate and save the total cost
             $analysis->recalculateTotalCost();
 
@@ -119,7 +135,7 @@ class UnitRateAnalysisController extends Controller
      */
     public function show(UnitRateAnalysis $ahs_library)
     {
-        $ahs_library->load(['materials.inventoryItem', 'labors.laborRate']);
+        $ahs_library->load(['materials.inventoryItem', 'labors.laborRate', 'equipments.equipment']);
         return view('ahs-library.show', compact('ahs_library'));
     }
 
@@ -129,13 +145,14 @@ class UnitRateAnalysisController extends Controller
     public function edit(UnitRateAnalysis $ahs_library)
     {
         // Load relationships needed for the form
-        $ahs_library->load(['materials.inventoryItem', 'labors.laborRate']);
+        $ahs_library->load(['materials.inventoryItem', 'labors.laborRate', 'equipments.equipment']);
 
         // Fetch master data for dropdowns
         $inventoryItems = InventoryItem::orderBy('item_name')->get();
         $laborRates = LaborRate::orderBy('labor_type')->get();
+        $equipments = Equipment::orderBy('name')->get();
 
-        return view('ahs-library.edit', compact('ahs_library', 'inventoryItems', 'laborRates'));
+        return view('ahs-library.edit', compact('ahs_library', 'inventoryItems', 'laborRates', 'equipments'));
     }
 
     /**
@@ -150,14 +167,21 @@ class UnitRateAnalysisController extends Controller
             'unit' => 'required|string|max:50',
             'overhead_profit_percentage' => 'required|numeric|min:0|max:100',
             'notes' => 'nullable|string',
+
             'materials' => 'nullable|array',
             'materials.*.inventory_item_id' => 'required_with:materials|exists:inventory_items,id',
             'materials.*.coefficient' => 'required_with:materials|numeric|min:0',
             'materials.*.unit_cost' => 'required_with:materials|numeric|min:0',
+
             'labors' => 'nullable|array',
             'labors.*.labor_rate_id' => 'required_with:labors|exists:labor_rates,id',
             'labors.*.coefficient' => 'required_with:labors|numeric|min:0',
             'labors.*.rate' => 'required_with:labors|numeric|min:0',
+
+            'equipments' => 'nullable|array',
+            'equipments.*.equipment_id' => 'required_with:equipments|exists:equipment,id',
+            'equipments.*.coefficient' => 'required_with:equipments|numeric|min:0',
+            'equipments.*.cost_rate' => 'required_with:equipments|numeric|min:0',
         ]);
 
         try {
@@ -195,6 +219,15 @@ class UnitRateAnalysisController extends Controller
                         'coefficient' => $laborData['coefficient'],
                         'rate' => $laborData['rate'],
                     ]);
+                }
+            }
+
+            // Sync Equipments
+            $ahs_library->equipments()->delete();
+            if ($request->has('equipments')) {
+                foreach ($validatedData['equipments'] as $equip) {
+                    if (empty($equip['equipment_id'])) continue;
+                    $ahs_library->equipments()->create($equip);
                 }
             }
 
@@ -252,7 +285,7 @@ class UnitRateAnalysisController extends Controller
         return view('ahs-library.import');
     }
 
-    public function analyzeImport(Request $request)
+   public function analyzeImport(Request $request)
     {
         $request->validate([
             'file' => 'required|mimes:xlsx,xls,csv',
@@ -266,31 +299,29 @@ class UnitRateAnalysisController extends Controller
         try {
             $allRows = Excel::toArray(new \stdClass(), $path)[0]; // [0] gets the first sheet
         } catch (\Exception $e) {
-            return back()->with('error', 'Could not read the file. Is it password protected? Error: ' . $e->getMessage());
+            return back()->with('error', 'Could not read the file. Error: ' . $e->getMessage());
         }
 
         // 3. Get the heading row (and remove it from $allRows)
-        $headings = array_shift($allRows);
+        $headings = array_map('trim', array_shift($allRows));
 
         // 4. Find missing items
         $existingMaterials = InventoryItem::pluck('item_name')->map('strtolower');
         $existingLabors = LaborRate::pluck('labor_type')->map('strtolower');
+        $existingEquipments = Equipment::pluck('name')->map('strtolower'); // <-- ADD THIS
 
         $problemRows = collect();
         
         // Loop through the *data rows*
         foreach ($allRows as $index => $rowArray) {
             
-            // Combine the headings with the current row's data
             $row = [];
             foreach ($headings as $i => $heading) {
-                // Trim whitespace from heading to be safe
                 $row[trim($heading)] = $rowArray[$i] ?? null;
             }
             
-            // --- FIX 1: Use the correct, exact column header ---
             $type = $row['component_type'] ?? null;
-            $name = $row['component_name (Used for Match)'] ?? null; // Was 'component_name_used_for_match'
+            $name = $row['component_name (Used for Match)'] ?? null;
 
             if (empty($type) || empty($name)) {
                 continue; // Skip header rows or blank rows
@@ -298,11 +329,13 @@ class UnitRateAnalysisController extends Controller
             
             $nameLower = strtolower($name);
 
-            // Check if this name is a problem
+            // --- MODIFIED: Check all 3 types ---
             if ($type == 'Material' && !$existingMaterials->contains($nameLower)) {
                 $problemRows->push(['type' => 'Material', 'name' => $name]);
             } elseif ($type == 'Labor' && !$existingLabors->contains($nameLower)) {
                 $problemRows->push(['type' => 'Labor', 'name' => $name]);
+            } elseif ($type == 'Equipment' && !$existingEquipments->contains($nameLower)) { // <-- ADD THIS
+                $problemRows->push(['type' => 'Equipment', 'name' => $name]);
             }
         }
 
@@ -310,7 +343,6 @@ class UnitRateAnalysisController extends Controller
 
         // If no problems, just process it immediately
         if ($uniqueProblems->isEmpty()) {
-            // We'll pass the request, but the import will pull the file from session
             return $this->processImport($request);
         }
 
@@ -318,24 +350,35 @@ class UnitRateAnalysisController extends Controller
         $problemsWithSuggestions = [];
         foreach ($uniqueProblems as $problem) {
             $suggestions = [];
-            $source = ($problem['type'] == 'Material') ? $existingMaterials : $existingLabors;
+            // --- MODIFIED: Choose the correct source ---
+            if ($problem['type'] == 'Material') {
+                $source = $existingMaterials;
+            } elseif ($problem['type'] == 'Labor') {
+                $source = $existingLabors;
+            } else {
+                $source = $existingEquipments;
+            }
 
             // Find "Did you mean?"
             foreach ($source as $existingName) {
-                // Use built-in similar_text to find close matches
                 similar_text(strtolower($problem['name']), $existingName, $percent);
-                if ($percent >= 75) { // 75% match or higher
+                if ($percent >= 75) {
                     // Find the original case-sensitive name to suggest
-                    $originalName = InventoryItem::where(DB::raw('LOWER(item_name)'), $existingName)->value('item_name') 
-                                 ?? LaborRate::where(DB::raw('LOWER(labor_type)'), $existingName)->value('labor_type');
-                    $suggestions[] = $originalName;
+                    $originalName = null;
+                    if ($problem['type'] == 'Material') {
+                         $originalName = InventoryItem::where(DB::raw('LOWER(item_name)'), $existingName)->value('item_name');
+                    } elseif ($problem['type'] == 'Labor') {
+                         $originalName = LaborRate::where(DB::raw('LOWER(labor_type)'), $existingName)->value('labor_type');
+                    } else {
+                         $originalName = Equipment::where(DB::raw('LOWER(name)'), $existingName)->value('name');
+                    }
+                    
+                    if($originalName) $suggestions[] = $originalName;
                 }
             }
             
-            $problem['suggestions'] = array_unique($suggestions); // Ensure suggestions are unique
-            
-            // --- FIX 2: Add $ to variable name ---
-            $problemsWithSuggestions[] = $problem; // Was 'problemsWithSuggestions[]'
+            $problem['suggestions'] = array_unique($suggestions);
+            $problemsWithSuggestions[] = $problem;
         }
 
         // Store problems in session and redirect to confirmation

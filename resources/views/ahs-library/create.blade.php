@@ -107,11 +107,43 @@
                             <button type="button" @click="addLabor()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Add Labor</button>
 
                             <hr class="my-6">
+                        <h3 class="text-lg font-semibold mb-2">Equipment</h3>
+                         <div class="space-y-3">
+                            <template x-for="(equipment, index) in equipments" :key="`eq-${index}`">
+                                <div class="flex items-center space-x-2 p-2 bg-gray-50 rounded border" x-init="initializeTomSelect($el.querySelector('.tom-select-equipments'))">
+                                    <div class="flex-1">
+                                        <label :for="`eq_id_${index}`" class="text-xs font-medium text-gray-700">Equipment</label>
+                                        <select x-model="equipment.equipment_id" @change="updateEquipmentCost(index, $event)" :id="`eq_id_${index}`" :name="`equipments[${index}][equipment_id]`" class="tom-select-equipments block mt-1 w-full border-gray-300 text-sm rounded-md shadow-sm" required>
+                                            <option value="">Select equipment...</option>
+                                            @foreach ($equipments as $eq)
+                                                <option value="{{ $eq->id }}" data-cost="{{ $eq->base_rental_rate ?? 0 }}">{{ $eq->name }} ({{ $eq->base_rental_rate_unit ?? 'unit' }})</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="w-28">
+                                        <label :for="`eq_coeff_${index}`" class="text-xs font-medium text-gray-700">Coefficient</label>
+                                        <input x-model.number="equipment.coefficient" :id="`eq_coeff_${index}`" type="number" step="0.0001" :name="`equipments[${index}][coefficient]`" class="block mt-1 w-full border-gray-300 text-sm rounded-md shadow-sm" required>
+                                    </div>
+                                    <div class="w-32">
+                                        <label :for="`eq_cost_${index}`" class="text-xs font-medium text-gray-700">Cost Rate (Rp)</label>
+                                        <input x-model.number="equipment.cost_rate" :id="`eq_cost_${index}`" type="number" step="0.01" :name="`equipments[${index}][cost_rate]`" class="block mt-1 w-full border-gray-300 text-sm rounded-md shadow-sm" required>
+                                    </div>
+                                    <div class="w-32 pt-5 text-sm font-medium text-right" x-text="formatCurrency(equipment.coefficient * equipment.cost_rate)"></div>
+                                    <div class="pt-5">
+                                        <button type="button" @click="removeEquipment(index)" class="text-red-500 hover:text-red-700">✖</button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        <button type="button" @click="addEquipment()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Add Equipment</button>
+
+                            <hr class="my-6">
                             <div class="flex justify-end">
                                 <div class="w-64 text-right">
                                     <p class="text-sm text-gray-600">Total Material Cost: <span x-text="formatCurrency(totalMaterialCost)"></span></p>
                                     <p class="text-sm text-gray-600">Total Labor Cost: <span x-text="formatCurrency(totalLaborCost)"></span></p>
-                                    <p class="text-sm text-gray-600 border-b pb-1 mb-1">Base Cost (Mat+Labor): <span class="font-semibold" x-text="formatCurrency(baseTotalCost)"></span></p>
+                                    <p class="text-sm text-gray-600">Total Equipment Cost: <span x-text="formatCurrency(totalEquipmentCost)"></span></p>
+                                    <p class="text-sm text-gray-600 border-b pb-1 mb-1">Base Cost (Mat+Lab+Eq): <span class="font-semibold" x-text="formatCurrency(baseTotalCost)"></span></p>
                                     <p class="text-sm text-gray-600">Overhead & Profit (<span x-text="overheadProfitPercentage"></span>%): <span x-text="formatCurrency(overheadProfitAmount)"></span></p>
                                     <p class="text-lg font-bold mt-1 pt-1">Final Unit Cost: <span x-text="formatCurrency(grandTotal)"></span></p>
                                 </div>
@@ -131,11 +163,13 @@
             // Store master data costs/rates for easy JS lookup
             const inventoryItemData = @json($inventoryItems->mapWithKeys(fn($item) => [$item->id => ['cost' => $item->latest_cost ?? 0]]));
             const laborRatesData = @json($laborRates->mapWithKeys(fn($rate) => [$rate->id => ['rate' => $rate->rate]]));
+            const equipmentData = @json($equipments->mapWithKeys(fn($eq) => [$eq->id => ['cost' => $eq->base_rental_rate ?? 0]]));
 
             function ahsForm() {
                 return {
                     materials: [],
                     labors: [],
+                    equipments: [],
                     overheadProfitPercentage: {{ old('overhead_profit_percentage', 0) }}, // Initialize from old input or default
 
                     addMaterial() {
@@ -164,6 +198,19 @@
                         this.labors[index].rate = parseFloat(selectedOption.getAttribute('data-rate')) || 0;
                     },
 
+                    addEquipment() {
+                        this.equipments.push({ equipment_id: '', coefficient: 0, cost_rate: 0 });
+                        this.$nextTick(() => { this.initializeSelects('.tom-select-equipments'); });
+                    },
+                    removeEquipment(index) {
+                        this.destroySelect(this.$el.querySelectorAll('.tom-select-equipments')[index]);
+                        this.equipments.splice(index, 1);
+                    },
+                    updateEquipmentCost(index, event) {
+                        const selectedOption = event.target.options[event.target.selectedIndex];
+                        this.equipments[index].cost_rate = parseFloat(selectedOption.getAttribute('data-cost')) || 0;
+                    },
+
                     // Calculation Properties
                     get totalMaterialCost() {
                         return this.materials.reduce((sum, item) => sum + ((item.coefficient || 0) * (item.unit_cost || 0)), 0);
@@ -171,8 +218,11 @@
                     get totalLaborCost() {
                         return this.labors.reduce((sum, item) => sum + ((item.coefficient || 0) * (item.rate || 0)), 0);
                     },
+                    get totalEquipmentCost() {
+                        return this.equipments.reduce((sum, item) => sum + ((item.coefficient || 0) * (item.cost_rate || 0)), 0);
+                    },
                     get baseTotalCost() {
-                        return this.totalMaterialCost + this.totalLaborCost; // Add equipment later
+                        return this.totalMaterialCost + this.totalLaborCost + this.totalEquipmentCost;
                     },
                      get overheadProfitAmount() {
                         return this.baseTotalCost * (this.overheadProfitPercentage / 100);
@@ -204,7 +254,7 @@
                     init() {
                          // Initialize any selects present on initial load
                          this.$nextTick(() => {
-                             this.$el.querySelectorAll('.tom-select-materials, .tom-select-labors').forEach(el => {
+                             this.$el.querySelectorAll('.tom-select-materials, .tom-select-labors, .tom-select-equipments').forEach(el => {
                                  if (!el.tomselect) {
                                      new TomSelect(el, { create: false, sortField: { field: "text", direction: "asc" } });
                                  }
@@ -213,6 +263,7 @@
                          // Add one empty row if none exist from old input
                          if (this.materials.length === 0 && {{ count(old('materials', [])) }} === 0) this.addMaterial();
                          if (this.labors.length === 0 && {{ count(old('labors', [])) }} === 0) this.addLabor();
+                         if (this.equipments.length === 0 && {{ count(old('equipments', [])) }} === 0) this.addEquipment();
                     }
                 }
             }

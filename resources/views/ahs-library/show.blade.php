@@ -1,18 +1,8 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                 <a href="{{ route('ahs-library.index') }}" class="text-indigo-600 hover:text-indigo-900">
-                    &larr; AHS Library
-                </a>
-                <span class="text-gray-500">/</span>
-                <span>{{ $ahs_library->code }}</span>
-            </h2>
-            <a href="{{ route('ahs-library.edit', $ahs_library) }}" class="inline-flex items-center px-4 py-2 bg-indigo-500 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-600 active:bg-indigo-700 focus:outline-none focus:border-indigo-700 focus:ring ring-indigo-300 disabled:opacity-25 transition ease-in-out duration-150">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                Edit AHS
-            </a>
-        </div>
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ __('AHS Details') }}: {{ $ahs_library->code }}
+        </h2>
     </x-slot>
 
     <div class="py-12">
@@ -20,64 +10,97 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 space-y-6">
 
-                    <div class="border-b pb-4">
-                        <h3 class="text-lg font-semibold">{{ $ahs_library->name }}</h3>
-                        <p class="text-sm text-gray-600">Code: <span class="font-mono">{{ $ahs_library->code }}</span> | Unit: <span class="font-semibold">{{ $ahs_library->unit }}</span></p>
-                         @if($ahs_library->notes)
-                            <p class="mt-2 text-sm text-gray-700">{{ $ahs_library->notes }}</p>
-                        @endif
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-2xl font-bold">{{ $ahs_library->name }}</h3>
+                            <p class="text-sm text-gray-500">Unit: <span class="font-medium text-gray-700">{{ $ahs_library->unit }}</span></p>
+                            <p class="text-sm text-gray-500">Overhead/Profit: <span class="font-medium text-gray-700">{{ $ahs_library->overhead_profit_percentage }}%</span></p>
+                            @if($ahs_library->notes)
+                            <p class="text-sm text-gray-500 mt-2">Notes: <span class="font-medium text-gray-700">{{ $ahs_library->notes }}</span></p>
+                            @endif
+                        </div>
+                        {{-- 1. REMOVED TOTAL COST FROM HEADER --}}
+                        <div class="text-right flex-shrink-0 ml-4">
+                            <a href="{{ route('ahs-library.edit', $ahs_library) }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500">
+                                Edit
+                            </a>
+                        </div>
                     </div>
+                    
+                    @php
+                        // Calculate subtotals
+                        $baseMaterialCost = $ahs_library->materials->sum(fn($i) => $i->coefficient * $i->unit_cost);
+                        $baseLaborCost = $ahs_library->labors->sum(fn($i) => $i->coefficient * $i->rate);
+                        $baseEquipmentCost = $ahs_library->equipments->sum(fn($i) => $i->coefficient * $i->cost_rate);
+                        $baseTotalCost = $baseMaterialCost + $baseLaborCost + $baseEquipmentCost;
+                    @endphp
 
+                    <hr>
+
+                    {{-- Materials --}}
                     <div>
-                        <h4 class="font-semibold mb-2 text-gray-800">Materials</h4>
-                        @if($ahs_library->materials->count() > 0)
-                            <ul class="list-disc list-inside space-y-1 text-sm">
-                                @foreach($ahs_library->materials as $mat)
+                        <h4 class="font-semibold text-gray-800">Materials</h4>
+                        {{-- 2. REMOVED SUBTOTAL FROM HERE --}}
+                        <ul class="mt-2 list-disc list-inside space-y-1 text-sm">
+                            @forelse($ahs_library->materials as $mat)
                                 <li>
-                                    <span class="font-medium">{{ $mat->inventoryItem->item_name }} ({{ $mat->inventoryItem->item_code }})</span>:
-                                    {{ rtrim(rtrim(number_format($mat->coefficient, 4), '0'), '.') }}
-                                    {{ $mat->inventoryItem->uom }}
-                                    @ Rp {{ number_format($mat->unit_cost, 0, ',', '.') }}
-                                    = <span class="font-semibold">Rp {{ number_format($mat->coefficient * $mat->unit_cost, 0, ',', '.') }}</span>
+                                    {{ $mat->inventoryItem->item_code }} - {{ $mat->inventoryItem->name }}
+                                    <span class="text-gray-600 ml-2">
+                                        ({{ $mat->coefficient }} x Rp {{ number_format($mat->unit_cost, 2) }} = <span class="font-medium">Rp {{ number_format($mat->coefficient * $mat->unit_cost, 2) }}</span>)
+                                    </span>
                                 </li>
-                                @endforeach
-                            </ul>
-                        @else
-                            <p class="text-sm text-gray-500">No materials defined.</p>
-                        @endif
+                            @empty
+                                <li class="text-gray-500 italic">No materials assigned.</li>
+                            @endforelse
+                        </ul>
+                    </div>
+                    
+                    {{-- Labors --}}
+                    <div>
+                        <h4 class="font-semibold text-gray-800">Labors</h4>
+                        {{-- 2. REMOVED SUBTOTAL FROM HERE --}}
+                        <ul class="mt-2 list-disc list-inside space-y-1 text-sm">
+                            @forelse($ahs_library->labors as $lab)
+                                <li>
+                                    {{ $lab->laborRate->labor_type }}
+                                    <span class="text-gray-600 ml-2">
+                                        ({{ $lab->coefficient }} x Rp {{ number_format($lab->rate, 2) }} = <span class="font-medium">Rp {{ number_format($lab->coefficient * $lab->rate, 2) }}</span>)
+                                    </span>
+                                </li>
+                            @empty
+                                <li class="text-gray-500 italic">No labors assigned.</li>
+                            @endforelse
+                        </ul>
                     </div>
 
-                     <div>
-                        <h4 class="font-semibold mb-2 text-gray-800">Labor</h4>
-                        @if($ahs_library->labors->count() > 0)
-                             <ul class="list-disc list-inside space-y-1 text-sm">
-                                @foreach($ahs_library->labors as $lab)
+                    {{-- Equipments --}}
+                    <div>
+                        <h4 class="font-semibold text-gray-800">Equipments</h4>
+                        {{-- 2. REMOVED SUBTOTAL FROM HERE --}}
+                        <ul class="mt-2 list-disc list-inside space-y-1 text-sm">
+                            @forelse($ahs_library->equipments as $eq)
                                 <li>
-                                    <span class="font-medium">{{ $lab->laborRate->labor_type }}</span>:
-                                    {{ rtrim(rtrim(number_format($lab->coefficient, 4), '0'), '.') }}
-                                    {{ $lab->laborRate->unit }}
-                                    @ Rp {{ number_format($lab->rate, 0, ',', '.') }}
-                                    = <span class="font-semibold">Rp {{ number_format($lab->coefficient * $lab->rate, 0, ',', '.') }}</span>
+                                    {{ $eq->equipment->name }}
+                                    <span class="text-gray-600 ml-2">
+                                        ({{ $eq->coefficient }} x Rp {{ number_format($eq->cost_rate, 2) }} = <span class="font-medium">Rp {{ number_format($eq->coefficient * $eq->cost_rate, 2) }}</span>)
+                                    </span>
                                 </li>
-                                @endforeach
-                            </ul>
-                        @else
-                             <p class="text-sm text-gray-500">No labor defined.</p>
-                        @endif
+                            @empty
+                                <li class="text-gray-500 italic">No equipments assigned.</li>
+                            @endforelse
+                        </ul>
                     </div>
 
-                    <div class="border-t pt-4 text-right">
-                         @php
-                            $baseMaterialCost = $ahs_library->materials()->sum(DB::raw('coefficient * unit_cost'));
-                            $baseLaborCost = $ahs_library->labors()->sum(DB::raw('coefficient * rate'));
-                            $baseTotal = $baseMaterialCost + $baseLaborCost;
-                            $overheadAmount = $baseTotal * ($ahs_library->overhead_profit_percentage / 100);
-                         @endphp
-                         <p class="text-sm text-gray-600">Material Cost: Rp {{ number_format($baseMaterialCost, 0, ',', '.') }}</p>
-                         <p class="text-sm text-gray-600">Labor Cost: Rp {{ number_format($baseLaborCost, 0, ',', '.') }}</p>
-                         <p class="text-sm text-gray-600 border-b pb-1 mb-1">Base Cost: <span class="font-semibold">Rp {{ number_format($baseTotal, 0, ',', '.') }}</span></p>
-                         <p class="text-sm text-gray-600">Overhead/Profit ({{ $ahs_library->overhead_profit_percentage }}%): Rp {{ number_format($overheadAmount, 0, ',', '.') }}</p>
-                        <p class="text-lg font-bold mt-1 pt-1">Final Unit Cost: Rp {{ number_format($ahs_library->total_cost, 0, ',', '.') }}</p>
+                    {{-- 2. ADDED SUBTOTALS TO THE FINAL SUMMARY BLOCK --}}
+                    <div class="flex justify-end mt-4">
+                         <div class="w-64 text-right border-t pt-4 space-y-1">
+                            <p class="text-sm text-gray-600">Total Material Cost: <span class="font-semibold"">Rp {{ number_format($baseMaterialCost, 2) }}</span></p>
+                            <p class="text-sm text-gray-600">Total Labor Cost: <span class="font-semibold"">Rp {{ number_format($baseLaborCost, 2) }}</span></p>
+                            <p class="text-sm text-gray-600">Total Equipment Cost: <span class="font-semibold"">Rp {{ number_format($baseEquipmentCost, 2) }}</span></p>
+                            <p class="text-sm text-gray-600 border-b pb-1 mb-1">Base Cost (Mat+Lab+Eq): <span class="font-semibold"">Rp {{ number_format($baseTotalCost, 2) }}</span></p>
+                            <p class="text-sm text-gray-600">Overhead ({{ $ahs_library->overhead_profit_percentage }}%): <span class="font-semibold"">Rp {{ number_format($baseTotalCost * ($ahs_library->overhead_profit_percentage / 100), 2) }}</span></p>
+                            <p class="text-lg font-bold mt-1 pt-1">Final Unit Cost: <span class="font-semibold"">Rp {{ number_format($ahs_library->total_cost, 2) }}</span></p>
+                        </div>
                     </div>
 
                 </div>

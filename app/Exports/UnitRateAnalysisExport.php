@@ -20,7 +20,8 @@ class UnitRateAnalysisExport implements FromCollection, WithHeadings
     */
     public function collection()
     {
-        $query = UnitRateAnalysis::with('materials.inventoryItem', 'labors.laborRate');
+        // --- MODIFIED: Eager load equipments.equipment ---
+        $query = UnitRateAnalysis::with('materials.inventoryItem', 'labors.laborRate', 'equipments.equipment');
 
         if ($this->ids) {
             $query->whereIn('id', $this->ids);
@@ -38,7 +39,7 @@ class UnitRateAnalysisExport implements FromCollection, WithHeadings
                 'ahs_overhead_profit_percentage' => $ahs->overhead_profit_percentage,
                 'component_type' => '',
                 'component_code' => '',
-                'component_name' => '',
+                'component_name_used_for_match' => '',
                 'coefficient' => '',
                 'component_unit_cost' => '',
             ]);
@@ -52,8 +53,8 @@ class UnitRateAnalysisExport implements FromCollection, WithHeadings
                         'ahs_unit' => '',
                         'ahs_overhead_profit_percentage' => '',
                         'component_type' => 'Material',
-                        'component_code' => $material->inventoryItem->item_code,
-                        'component_name' => $material->inventoryItem->item_name,
+                        'component_code' => $material->inventoryItem->item_code, // For reference
+                        'component_name_used_for_match' => $material->inventoryItem->item_name, // Used for import
                         'coefficient' => $material->coefficient,
                         'component_unit_cost' => $material->unit_cost,
                     ]);
@@ -69,9 +70,26 @@ class UnitRateAnalysisExport implements FromCollection, WithHeadings
                         'ahs_overhead_profit_percentage' => '',
                         'component_type' => 'Labor',
                         'component_code' => '',
-                        'component_name' => $labor->laborRate->labor_type, 
+                        'component_name_used_for_match' => $labor->laborRate->labor_type, // Used for import
                         'coefficient' => $labor->coefficient,
                         'component_unit_cost' => $labor->rate,
+                    ]);
+                }
+            }
+            
+            // --- 4. ADDED: Add Equipment rows ---
+            foreach ($ahs->equipments as $equipment) {
+                if ($equipment->equipment) {
+                    $excelRows->push([
+                        'ahs_code' => '',
+                        'ahs_name' => '',
+                        'ahs_unit' => '',
+                        'ahs_overhead_profit_percentage' => '',
+                        'component_type' => 'Equipment',
+                        'component_code' => $equipment->equipment->identifier, // For reference
+                        'component_name_used_for_match' => $equipment->equipment->name, // Used for import
+                        'coefficient' => $equipment->coefficient,
+                        'component_unit_cost' => $equipment->cost_rate,
                     ]);
                 }
             }

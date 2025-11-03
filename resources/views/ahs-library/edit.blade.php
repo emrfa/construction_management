@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Edit AHS Definition') }} <!-- Title Updated -->
+            {{ __('Edit AHS Definition') }}: {{ $ahs_library->name }}
         </h2>
     </x-slot>
 
@@ -11,31 +11,27 @@
                 <div class="p-6 text-gray-900">
 
                     <div x-data="ahsForm()">
-                        <form method="POST" action="{{ route('ahs-library.update', $ahs_library) }}"> <!-- Action Updated -->
-                            @method('PUT') <!-- Method Updated -->
+                        <form method="POST" action="{{ route('ahs-library.update', $ahs_library) }}">
                             @csrf
+                            @method('PATCH')
 
                             <h3 class="text-lg font-semibold border-b pb-2 mb-4">AHS Details</h3>
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                                 <div>
                                     <x-input-label for="code" :value="__('AHS Code')" />
                                     <x-text-input id="code" class="block mt-1 w-full" type="text" name="code" :value="old('code', $ahs_library->code)" required autofocus />
-                                    <p class="text-xs text-gray-500 mt-1">Unique code, e.g., AHS.CONC.K225</p>
                                 </div>
                                 <div>
                                     <x-input-label for="name" :value="__('AHS Name')" />
                                     <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name', $ahs_library->name)" required />
-                                    <p class="text-xs text-gray-500 mt-1">e.g., Analisa Beton K-225</p>
                                 </div>
                                 <div>
                                     <x-input-label for="unit" :value="__('Unit')" />
                                     <x-text-input id="unit" class="block mt-1 w-full" type="text" name="unit" :value="old('unit', $ahs_library->unit)" required />
-                                    <p class="text-xs text-gray-500 mt-1">Unit for the analysis, e.g., m³, m², bh</p>
                                 </div>
                                 <div>
                                     <x-input-label for="overhead_profit_percentage" :value="__('Overhead/Profit (%)')" />
                                     <x-text-input x-model.number="overheadProfitPercentage" id="overhead_profit_percentage" class="block mt-1 w-full" type="number" step="0.01" name="overhead_profit_percentage" :value="old('overhead_profit_percentage', $ahs_library->overhead_profit_percentage)" required min="0" max="100"/>
-                                    <p class="text-xs text-gray-500 mt-1">e.g., 15 for 15%</p>
                                 </div>
                             </div>
                             <div>
@@ -78,10 +74,10 @@
                             <h3 class="text-lg font-semibold mb-2">Labor</h3>
                              <div class="space-y-3">
                                 <template x-for="(labor, index) in labors" :key="`lab-${index}`">
-                                     <div class="flex items-center space-x-2 p-2 bg-gray-50 rounded border" x-init="initializeTomSelect($el.querySelector('.tom-select-labors'))">
+                                    <div class="flex items-center space-x-2 p-2 bg-gray-50 rounded border" x-init="initializeTomSelect($el.querySelector('.tom-select-labors'))">
                                         <div class="flex-1">
                                             <label :for="`lab_id_${index}`" class="text-xs font-medium text-gray-700">Labor Type</label>
-                                             <select x-model="labor.labor_rate_id" @change="updateLaborRate(index, $event)" :id="`lab_id_${index}`" :name="`labors[${index}][labor_rate_id]`" class="tom-select-labors block mt-1 w-full border-gray-300 text-sm rounded-md shadow-sm" required>
+                                            <select x-model="labor.labor_rate_id" @change="updateLaborRate(index, $event)" :id="`lab_id_${index}`" :name="`labors[${index}][labor_rate_id]`" class="tom-select-labors block mt-1 w-full border-gray-300 text-sm rounded-md shadow-sm" required>
                                                 <option value="">Select labor...</option>
                                                 @foreach ($laborRates as $rate)
                                                     <option value="{{ $rate->id }}" data-rate="{{ $rate->rate }}">{{ $rate->labor_type }} ({{ $rate->unit }})</option>
@@ -105,136 +101,190 @@
                             </div>
                             <button type="button" @click="addLabor()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Add Labor</button>
 
+                            {{-- === NEW EQUIPMENT SECTION === --}}
+                            <hr class="my-6">
+                            <h3 class="text-lg font-semibold mb-2">Equipment</h3>
+                            <div class="space-y-3">
+                                <template x-for="(equipment, index) in equipments" :key="`eq-${index}`">
+                                    <div class="flex items-center space-x-2 p-2 bg-gray-50 rounded border" x-init="initializeTomSelect($el.querySelector('.tom-select-equipments'))">
+                                        <div class="flex-1">
+                                            <label :for="`eq_id_${index}`" class="text-xs font-medium text-gray-700">Equipment</label>
+                                            <select x-model="equipment.equipment_id" @change="updateEquipmentCost(index, $event)" :id="`eq_id_${index}`" :name="`equipments[${index}][equipment_id]`" class="tom-select-equipments block mt-1 w-full border-gray-300 text-sm rounded-md shadow-sm" required>
+                                                <option value="">Select equipment...</option>
+                                                @foreach ($equipments as $eq)
+                                                    <option value="{{ $eq->id }}" data-cost="{{ $eq->base_rental_rate ?? 0 }}">{{ $eq->name }} ({{ $eq->base_rental_rate_unit ?? 'unit' }})</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="w-28">
+                                            <label :for="`eq_coeff_${index}`" class="text-xs font-medium text-gray-700">Coefficient</label>
+                                            <input x-model.number="equipment.coefficient" :id="`eq_coeff_${index}`" type="number" step="0.0001" :name="`equipments[${index}][coefficient]`" class="block mt-1 w-full border-gray-300 text-sm rounded-md shadow-sm" required>
+                                        </div>
+                                        <div class="w-32">
+                                            <label :for="`eq_cost_${index}`" class="text-xs font-medium text-gray-700">Cost Rate (Rp)</label>
+                                            <input x-model.number="equipment.cost_rate" :id="`eq_cost_${index}`" type="number" step="0.01" :name="`equipments[${index}][cost_rate]`" class="block mt-1 w-full border-gray-300 text-sm rounded-md shadow-sm" required>
+                                        </div>
+                                        <div class="w-32 pt-5 text-sm font-medium text-right" x-text="formatCurrency(equipment.coefficient * equipment.cost_rate)"></div>
+                                        <div class="pt-5">
+                                            <button type="button" @click="removeEquipment(index)" class="text-red-500 hover:text-red-700">✖</button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                            <button type="button" @click="addEquipment()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Add Equipment</button>
+                            {{-- === END NEW EQUIPMENT SECTION === --}}
+
                             <hr class="my-6">
                             <div class="flex justify-end">
                                 <div class="w-64 text-right">
                                     <p class="text-sm text-gray-600">Total Material Cost: <span x-text="formatCurrency(totalMaterialCost)"></span></p>
                                     <p class="text-sm text-gray-600">Total Labor Cost: <span x-text="formatCurrency(totalLaborCost)"></span></p>
-                                    <p class="text-sm text-gray-600 border-b pb-1 mb-1">Base Cost (Mat+Labor): <span class="font-semibold" x-text="formatCurrency(baseTotalCost)"></span></p>
+                                    <p class="text-sm text-gray-600">Total Equipment Cost: <span x-text="formatCurrency(totalEquipmentCost)"></span></p>
+                                    <p class="text-sm text-gray-600 border-b pb-1 mb-1">Base Cost (Mat+Lab+Eq): <span class="font-semibold" x-text="formatCurrency(baseTotalCost)"></span></p>
                                     <p class="text-sm text-gray-600">Overhead & Profit (<span x-text="overheadProfitPercentage"></span>%): <span x-text="formatCurrency(overheadProfitAmount)"></span></p>
                                     <p class="text-lg font-bold mt-1 pt-1">Final Unit Cost: <span x-text="formatCurrency(grandTotal)"></span></p>
                                 </div>
                             </div>
 
                             <div class="flex items-center justify-end mt-6 border-t pt-4">
-                                <!-- Cancel button points back to Show page -->
-                                <a href="{{ route('ahs-library.show', $ahs_library) }}" class="text-sm text-gray-600 hover:text-gray-900 rounded-md"> {{ __('Cancel') }} </a>
-                                <x-primary-button class="ml-4"> {{ __('Update AHS') }} </x-primary-button> <!-- Button Text Updated -->
+                                <a href="{{ route('ahs-library.index') }}" class="text-sm text-gray-600 hover:text-gray-900 rounded-md"> {{ __('Cancel') }} </a>
+                                <x-primary-button class="ml-4"> {{ __('Update AHS') }} </x-primary-button>
                             </div>
                         </form>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <script>
-            // Store master data costs/rates for easy JS lookup
-            const inventoryItemData = @json($inventoryItems->mapWithKeys(fn($item) => [$item->id => ['cost' => $item->latest_cost ?? 0]]));
-            const laborRatesData = @json($laborRates->mapWithKeys(fn($rate) => [$rate->id => ['rate' => $rate->rate]]));
+    <script>
+        // Store master data
+        const inventoryItemData = @json($inventoryItems->mapWithKeys(fn($item) => [$item->id => ['cost' => $item->latest_cost ?? 0]]));
+        const laborRatesData = @json($laborRates->mapWithKeys(fn($rate) => [$rate->id => ['rate' => $rate->rate]]));
+        const equipmentData = @json($equipments->mapWithKeys(fn($eq) => [$eq->id => ['cost' => $eq->base_rental_rate ?? 0]]));
 
-            function ahsForm() {
-                return {
-                    // Initialize with existing data from the controller
-                    materials: @json($ahs_library->materials->map(fn($mat) => [
-                        'inventory_item_id' => $mat->inventory_item_id,
-                        'coefficient' => (float) $mat->coefficient, // Cast to float
-                        'unit_cost' => (float) $mat->unit_cost // Cast to float
-                    ])),
-                    labors: @json($ahs_library->labors->map(fn($lab) => [
-                        'labor_rate_id' => $lab->labor_rate_id,
-                        'coefficient' => (float) $lab->coefficient, // Cast to float
-                        'rate' => (float) $lab->rate // Cast to float
-                    ])),
-                    overheadProfitPercentage: {{ old('overhead_profit_percentage', $ahs_library->overhead_profit_percentage) }},
+        // --- PRE-POPULATE DATA FROM THE MODEL ---
+        const initialMaterials = @json($ahs_library->materials->map(fn($m) => [
+            'inventory_item_id' => $m->inventory_item_id,
+            'coefficient' => (float)$m->coefficient,
+            'unit_cost' => (float)$m->unit_cost
+        ]));
+        
+        const initialLabors = @json($ahs_library->labors->map(fn($l) => [
+            'labor_rate_id' => $l->labor_rate_id,
+            'coefficient' => (float)$l->coefficient,
+            'rate' => (float)$l->rate
+        ]));
 
-                    addMaterial() {
-                        this.materials.push({ inventory_item_id: '', coefficient: 0, unit_cost: 0 });
-                        this.$nextTick(() => { this.initializeSelects('.tom-select-materials'); });
-                    },
-                    removeMaterial(index) {
-                        this.destroySelect(this.$el.querySelectorAll('.tom-select-materials')[index]);
-                        this.materials.splice(index, 1);
-                    },
-                    // Pass the full event to access selected option's data attribute
-                    updateMaterialCost(index, event) {
-                         const selectedOption = event.target.options[event.target.selectedIndex];
-                         this.materials[index].unit_cost = parseFloat(selectedOption.getAttribute('data-cost')) || 0;
-                    },
+        const initialEquipments = @json($ahs_library->equipments->map(fn($e) => [
+            'equipment_id' => $e->equipment_id,
+            'coefficient' => (float)$e->coefficient,
+            'cost_rate' => (float)$e->cost_rate
+        ]));
+        // --- END PRE-POPULATION ---
 
-                    addLabor() {
-                        this.labors.push({ labor_rate_id: '', coefficient: 0, rate: 0 });
-                         this.$nextTick(() => { this.initializeSelects('.tom-select-labors'); });
-                    },
-                    removeLabor(index) {
-                         this.destroySelect(this.$el.querySelectorAll('.tom-select-labors')[index]);
-                        this.labors.splice(index, 1);
-                    },
-                    // Pass the full event to access selected option's data attribute
-                    updateLaborRate(index, event) {
-                        const selectedOption = event.target.options[event.target.selectedIndex];
-                        this.labors[index].rate = parseFloat(selectedOption.getAttribute('data-rate')) || 0;
-                    },
+        function ahsForm() {
+            return {
+                materials: initialMaterials,
+                labors: initialLabors,
+                equipments: initialEquipments,
+                overheadProfitPercentage: {{ old('overhead_profit_percentage', $ahs_library->overhead_profit_percentage) }},
 
-                    // Calculation Properties
-                    get totalMaterialCost() {
-                        return this.materials.reduce((sum, item) => sum + ((parseFloat(item.coefficient) || 0) * (parseFloat(item.unit_cost) || 0)), 0);
-                    },
-                    get totalLaborCost() {
-                        return this.labors.reduce((sum, item) => sum + ((parseFloat(item.coefficient) || 0) * (parseFloat(item.rate) || 0)), 0);
-                    },
-                    get baseTotalCost() {
-                        return this.totalMaterialCost + this.totalLaborCost; // Add equipment later
-                    },
-                     get overheadProfitAmount() {
-                        return this.baseTotalCost * ((parseFloat(this.overheadProfitPercentage) || 0) / 100);
-                    },
-                    get grandTotal() {
-                        return this.baseTotalCost + this.overheadProfitAmount;
-                    },
+                addMaterial() {
+                    this.materials.push({ inventory_item_id: '', coefficient: 0, unit_cost: 0 });
+                    this.$nextTick(() => { this.initializeSelects('.tom-select-materials'); });
+                },
+                removeMaterial(index) {
+                    this.destroySelect(this.$el.querySelectorAll('.tom-select-materials')[index]);
+                    this.materials.splice(index, 1);
+                },
+                updateMaterialCost(index, event) {
+                    const selectedOption = event.target.options[event.target.selectedIndex];
+                    this.materials[index].unit_cost = parseFloat(selectedOption.getAttribute('data-cost')) || 0;
+                },
 
-                    // Helper Functions
-                    formatCurrency(value) {
-                         if (isNaN(value)) return 'Rp 0';
-                        return parseFloat(value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 2 }); // Allow decimals in display
-                    },
-                    initializeSelects(selector) {
-                        let selects = this.$el.querySelectorAll(selector + ':not(.ts-wrapper)');
-                        if (selects.length > 0) {
-                            let lastSelect = selects[selects.length - 1];
-                            if (lastSelect && !lastSelect.tomselect) {
-                                new TomSelect(lastSelect, { create: false, sortField: { field: "text", direction: "asc" } });
-                            }
-                        }
-                    },
-                    destroySelect(element) {
-                        if (element && element.tomselect) {
-                            element.tomselect.destroy();
-                        }
-                    },
-                    init() {
-                         this.$nextTick(() => {
-                             this.$el.querySelectorAll('.tom-select-materials, .tom-select-labors').forEach(el => {
-                                 // Ensure pre-selected values are reflected in TomSelect
-                                 const initialValue = el.value;
-                                 if (!el.tomselect) {
-                                     let tomInstance = new TomSelect(el, { create: false, sortField: { field: "text", direction: "asc" } });
-                                     // TomSelect sometimes resets value on init, set it back if needed
-                                     if(initialValue) {
-                                         tomInstance.setValue(initialValue, true); // silent = true
-                                     }
-                                 } else {
-                                     // If already initialized (e.g., from browser back button), ensure value is set
-                                     if (el.value) {
-                                         el.tomselect.setValue(el.value, true);
-                                     }
-                                 }
-                             });
-                         });
-                         // Add empty row only if NO items were loaded from DB and NO old input exists
-                         if (this.materials.length === 0 && {{ count(old('materials', [])) }} === 0) this.addMaterial();
-                         if (this.labors.length === 0 && {{ count(old('labors', [])) }} === 0) this.addLabor();
+                addLabor() {
+                    this.labors.push({ labor_rate_id: '', coefficient: 0, rate: 0 });
+                    this.$nextTick(() => { this.initializeSelects('.tom-select-labors'); });
+                },
+                removeLabor(index) {
+                    this.destroySelect(this.$el.querySelectorAll('.tom-select-labors')[index]);
+                    this.labors.splice(index, 1);
+                },
+                updateLaborRate(index, event) {
+                    const selectedOption = event.target.options[event.target.selectedIndex];
+                    this.labors[index].rate = parseFloat(selectedOption.getAttribute('data-rate')) || 0;
+                },
+
+                // --- ADD EQUIPMENT FUNCTIONS ---
+                addEquipment() {
+                    this.equipments.push({ equipment_id: '', coefficient: 0, cost_rate: 0 });
+                    this.$nextTick(() => { this.initializeSelects('.tom-select-equipments'); });
+                },
+                removeEquipment(index) {
+                    this.destroySelect(this.$el.querySelectorAll('.tom-select-equipments')[index]);
+                    this.equipments.splice(index, 1);
+                },
+                updateEquipmentCost(index, event) {
+                    const selectedOption = event.target.options[event.target.selectedIndex];
+                    this.equipments[index].cost_rate = parseFloat(selectedOption.getAttribute('data-cost')) || 0;
+                },
+                // --- END EQUIPMENT FUNCTIONS ---
+
+                // Calculation Properties
+                get totalMaterialCost() {
+                    return this.materials.reduce((sum, item) => sum + ((item.coefficient || 0) * (item.unit_cost || 0)), 0);
+                },
+                get totalLaborCost() {
+                    return this.labors.reduce((sum, item) => sum + ((item.coefficient || 0) * (item.rate || 0)), 0);
+                },
+                get totalEquipmentCost() {
+                    return this.equipments.reduce((sum, item) => sum + ((item.coefficient || 0) * (item.cost_rate || 0)), 0);
+                },
+                get baseTotalCost() {
+                    return this.totalMaterialCost + this.totalLaborCost + this.totalEquipmentCost;
+                },
+                 get overheadProfitAmount() {
+                    return this.baseTotalCost * (this.overheadProfitPercentage / 100);
+                },
+                get grandTotal() {
+                    return this.baseTotalCost + this.overheadProfitAmount;
+                },
+
+                // Helper Functions
+                formatCurrency(value) {
+                     if (isNaN(value)) return 'Rp 0';
+                    return value.toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
+                },
+                initializeSelects(selector) {
+                     let selects = this.$el.querySelectorAll(selector + ':not(.ts-wrapper)');
+                     if (selects.length > 0) {
+                         let lastSelect = selects[selects.length - 1];
+                         if (lastSelect && !lastSelect.tomselect) {
+                             new TomSelect(lastSelect, { create: false, sortField: { field: "text", direction: "asc" } });
+                         }
+                     }
+                },
+                destroySelect(element) {
+                    if (element && element.tomselect) {
+                        element.tomselect.destroy();
                     }
+                },
+                init() {
+                     this.$nextTick(() => {
+                         this.$el.querySelectorAll('.tom-select-materials, .tom-select-labors, .tom-select-equipments').forEach(el => {
+                             if (!el.tomselect) {
+                                 new TomSelect(el, { create: false, sortField: { field: "text", direction: "asc" } });
+                             }
+                         });
+                     });
+                     
+                     // Don't add empty rows if data is loaded
+                     if (this.materials.length === 0) this.addMaterial();
+                     if (this.labors.length === 0) this.addLabor();
+                     if (this.equipments.length === 0) this.addEquipment();
                 }
             }
-        </script>
-    </x-app-layout>
+        }
+    </script>
+</x-app-layout>
