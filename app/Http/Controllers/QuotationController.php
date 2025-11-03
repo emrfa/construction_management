@@ -87,9 +87,17 @@ class QuotationController extends Controller
         'items_json' => 'required|json', // Validate that it's a valid JSON string
     ]);
 
+    
+
     // vvv ADD THIS LINE vvv
     // Decode the JSON string into the array our saveItems method expects
     $itemsArray = json_decode($validatedData['items_json'], true);
+
+        try {
+        $this->validateHierarchy($itemsArray);
+    } catch (\Exception $e) {
+        return back()->withInput()->withErrors(['items_json' => $e->getMessage()]);
+    }
 
     $itemsValidator = \Illuminate\Support\Facades\Validator::make(['items' => $itemsArray], [
             'items' => 'required|array|min:1',
@@ -158,6 +166,49 @@ class QuotationController extends Controller
     // 8. Redirect to the list page
     return redirect()->route('quotations.show', $quotation)->with('success', 'Quotation created successfully.');
     }
+
+    private function validateHierarchy(array $items, ?string $parentType = null)
+{
+    foreach ($items as $index => $item) {
+        $type = $item['type'] ?? null;
+
+        // Basic type presence
+        if (!$type) {
+            throw new \Exception("Item at index {$index} is missing 'type'.");
+        }
+
+        // Parent-child rules
+        if ($parentType === 'work_item' && $type !== 'ahs') {
+            throw new \Exception("Work Item may only contain AHS children (illegal child type '{$type}').");
+        }
+        if ($parentType === 'ahs') {
+            throw new \Exception("AHS cannot have children.");
+        }
+        if ($type === 'sub_project' && $parentType !== null) {
+            throw new \Exception("Sub Project must be a root-level item.");
+        }
+        if ($type === 'work_type' && !in_array($parentType, [null, 'sub_project'])) {
+            throw new \Exception("Work Type can only be root-level or under a Sub Project.");
+        }
+        if ($type === 'work_item' && $parentType !== 'work_type') {
+            throw new \Exception("Work Item must be under a Work Type.");
+        }
+
+        // Recursively validate children
+        if (!empty($item['children']) && is_array($item['children'])) {
+            $this->validateHierarchy($item['children'], $type);
+        } else {
+            // if parent type expects children ensure array is present for parents
+            if (in_array($type, ['sub_project','work_type','work_item']) && empty($item['children'])) {
+                // It's OK for a Work Type or Work Item to be empty (manual add), so we don't force children.
+                // But ensure types like 'ahs' don't have children
+                if ($type === 'ahs' && !empty($item['children'])) {
+                    throw new \Exception("AHS cannot have children.");
+                }
+            }
+        }
+    }
+}
 
     /**
  * A private helper function to recursively save items.
@@ -292,6 +343,11 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
 
         // Decode the JSON string into an array
         $itemsArray = json_decode($validatedData['items_json'], true);
+        try {
+                $this->validateHierarchy($itemsArray);
+            } catch (\Exception $e) {
+                return back()->withInput()->withErrors(['items_json' => $e->getMessage()]);
+            }
 
         $itemsValidator = \Illuminate\Support\Facades\Validator::make(['items' => $itemsArray], [
         'items' => 'required|array|min:1',

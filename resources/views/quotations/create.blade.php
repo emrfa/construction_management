@@ -129,7 +129,7 @@
                                                     <div class="flex items-center space-x-2">
                                                         
                                                         {{-- This is for BLANK SECTIONS (Sub-Projects) --}}
-                                                        <template x-if="!item.isWorkType">
+                                                        <template x-if="item.type === 'sub_project'">
                                                             <select @change="addWorkType($event.target.value, item.children); $event.target.tomselect.clear();"
                                                                 class="block text-xs border-gray-300 rounded-md shadow-sm py-1"
                                                                 x-init="initializeSelects($el, false)">
@@ -142,7 +142,7 @@
                                                         </template>
 
                                                         {{-- FIX 3: This is for WORK TYPES --}}
-                                                        <template x-if="item.isWorkType">
+                                                        <template x-if="item.type === 'work_type'">
                                                             {{-- NEW: Select to add from library --}}
                                                             <select @change="addWorkItemFromLibrary($event.target.value, item.children); $event.target.tomselect.clear();"
                                                                 class="block text-xs border-gray-300 rounded-md shadow-sm py-1"
@@ -231,280 +231,287 @@
 
     @push('head-scripts')
     <script>
-        // FIX 1: Add workItemsLibrary to the function signature
-        window.rabBuilder = function(ahsLibraryData, workTypesLibrary, oldItems, workItemsLibrary) {
-            return {
-                items: oldItems || [],
-                ahsData: ahsLibraryData,
-                library: {
-                    workTypes: workTypesLibrary,
-                    workItems: workItemsLibrary // Add the new library
-                },
-                initSelectCounter: 0,
+window.rabBuilder = function(ahsLibraryData, workTypesLibrary, oldItems, workItemsLibrary) {
+    return {
+        items: oldItems || [],
+        ahsData: ahsLibraryData,
+        library: {
+            workTypes: workTypesLibrary,
+            workItems: workItemsLibrary
+        },
+        initSelectCounter: 0,
 
-                init() {
-                    if (typeof TomSelect === 'undefined') {
-                        console.warn('TomSelect not loaded. Select dropdowns will not be enhanced.');
-                    }
-                    if (this.items.length === 0) { 
-                        this.addRootSection(); 
-                    } else {
-                        // Re-hydrate data on validation error
-                        const rehydrate = (items) => {
-                            items.forEach(item => {
-                                if (!item.isParent && item.unit_rate_analysis_id && this.ahsData[item.unit_rate_analysis_id]) {
-                                    item.description = this.ahsData[item.unit_rate_analysis_id].name;
-                                }
-                                if (item.isParent && item.children && item.children.length > 0) {
-                                    // A Work Type is a parent whose children are also parents (Work Items)
-                                    item.isWorkType = item.children.some(child => child.isParent);
-                                }
-                                if (item.children) {
-                                    rehydrate(item.children);
-                                }
-                            });
-                        };
-                        rehydrate(this.items);
+        init() {
+            if (typeof TomSelect === 'undefined') {
+                console.warn('TomSelect not loaded. Select dropdowns will not be enhanced.');
+            }
 
-                        this.$nextTick(() => { 
-                            this.initializeAllSelects(document);
-                        });
-                    }
-                },
+            if (this.items.length === 0) {
+                // start empty — user decides whether to add Sub Project or Work Type
+                this.items = [];
+            } else {
+                const normalize = (arr, parentType = null) => {
+                    arr.forEach(item => {
+                        item.parentType = parentType;
+                        if (item.children && item.children.length) {
+                            normalize(item.children, item.type || null);
+                        }
+                    });
+                };
+                normalize(this.items, null);
+            }
 
-                addWorkType(workTypeId, targetArray) {
-                    if (!workTypeId) return;
-                    const workType = this.library.workTypes.find(wt => wt.id == workTypeId);
-                    if (!workType) return;
+            this.$nextTick(() => {
+                this.initializeAllSelects(document);
+            });
+        },
 
-                    // 1. Create the main parent item for the Work Type
-                    let newWorkTypeItem = this.newItem(true, true); // isParent: true, isWorkType: true
-                    newWorkTypeItem.description = workType.name;
+        /** ------------------------------
+         * ADD FUNCTIONS
+         * ------------------------------ */
+        addRootSection() {
+            this.items.push(this.newItem(true, false, 'sub_project'));
+        },
 
-                    // 2. NEW: Check for and add DIRECT AHS links as line items
-                    if (workType.unit_rate_analyses && workType.unit_rate_analyses.length > 0) {
-                        workType.unit_rate_analyses.forEach(ahs => {
-                            let newAhsItem = this.newItem(false, false); // isParent: false
-                            newAhsItem.unit_rate_analysis_id = ahs.id;
-                            newAhsItem.description = ahs.name; // Use AHS name directly
-                            newAhsItem.item_code = ahs.code;
-                            newAhsItem.uom = ahs.unit;
-                            newAhsItem.unit_price = parseFloat(ahs.total_cost) || 0;
-                            newAhsItem.quantity = 1; // Default to 1
-                            newWorkTypeItem.children.push(newAhsItem); // Add to the Work Type's children
-                        });
-                    }
+        addWorkType(workTypeId, targetArray, parentType = null) {
+            if (!workTypeId) return;
+            if (parentType && !['sub_project', null].includes(parentType)) {
+                alert('Work Types can only be added under root or Sub Project.');
+                return;
+            }
 
-                    // 3. EXISTING: Check for and add CHILD WORK ITEMS as sub-parents
-                    if (workType.work_items && workType.work_items.length > 0) {
-                        workType.work_items.forEach(workItem => {
-                            let newWorkItem = this.newItem(true, false); // isParent: true
-                            newWorkItem.description = workItem.name;
-                            
-                            // Check if the work item has AHS links
-                            if (workItem.unit_rate_analyses && workItem.unit_rate_analyses.length > 0) {
-                                workItem.unit_rate_analyses.forEach(ahs => {
-                                    let newAhsItem = this.newItem(false, false);
-                                    newAhsItem.unit_rate_analysis_id = ahs.id;
-                                    newAhsItem.description = ahs.name;
-                                    newAhsItem.item_code = ahs.code;
-                                    newAhsItem.uom = ahs.unit;
-                                    newAhsItem.unit_price = parseFloat(ahs.total_cost) || 0;
-                                    newAhsItem.quantity = 1;
-                                    newWorkItem.children.push(newAhsItem);
-                                });
-                            }
-                            
-                            // Only add the child Work Item if it actually contains AHS items
-                            if (newWorkItem.children.length > 0) {
-                                newWorkTypeItem.children.push(newWorkItem);
-                            }
-                        });
-                    }
+            const workType = this.library.workTypes.find(wt => wt.id == workTypeId);
+            if (!workType) return;
 
-                    // 4. Final check: Only add the Work Type if it produced any children
-                    if (newWorkTypeItem.children.length > 0) {
-                        targetArray.push(newWorkTypeItem);
-                        this.$nextTick(() => { 
-                            this.initializeAllSelects(this.$el);
-                        });
-                    } else {
-                        // Updated alert message
-                        alert('This Work Type has no direct AHS links and no child Work Items with AHS data to import.');
-                    }
-                },
+            let newWorkTypeItem = this.newItem(true, true, 'work_type');
+            newWorkTypeItem.description = workType.name;
 
-                // FIX 2: NEW function to add a Work Item from the library
-                addWorkItemFromLibrary(workItemId, targetArray) {
-                    if (!workItemId) return;
-                    const workItem = this.library.workItems.find(wi => wi.id == workItemId);
-                    if (!workItem) return;
+            // Add direct AHS links (if any)
+            if (workType.unit_rate_analyses?.length > 0) {
+                workType.unit_rate_analyses.forEach(ahs => {
+                    let newAhsItem = this.newItem(false, false, 'ahs');
+                    Object.assign(newAhsItem, {
+                        unit_rate_analysis_id: ahs.id,
+                        description: ahs.name,
+                        item_code: ahs.code,
+                        uom: ahs.unit,
+                        unit_price: parseFloat(ahs.total_cost) || 0,
+                        quantity: 1
+                    });
+                    newWorkTypeItem.children.push(newAhsItem);
+                });
+            }
 
-                    let newWorkItem = this.newItem(true, false); // isParent: true, isWorkType: false
+            // Add Work Items
+            if (workType.work_items?.length > 0) {
+                workType.work_items.forEach(workItem => {
+                    let newWorkItem = this.newItem(true, false, 'work_item');
                     newWorkItem.description = workItem.name;
-                    
-                    workItem.unit_rate_analyses.forEach(ahs => {
-                        let newAhsItem = this.newItem(false, false);
-                        newAhsItem.unit_rate_analysis_id = ahs.id;
-                        newAhsItem.description = ahs.name;
-                        newAhsItem.item_code = ahs.code;
-                        newAhsItem.uom = ahs.unit;
-                        newAhsItem.unit_price = parseFloat(ahs.total_cost) || 0;
-                        newAhsItem.quantity = 1;
-                        newWorkItem.children.push(newAhsItem);
-                    });
-                    
-                    // Always add the work item, even if it has no AHS items
-                    targetArray.push(newWorkItem);
-                    newWorkItem.open = true; // Ensure it's open
-                    
-                    this.$nextTick(() => { 
-                        this.initializeAllSelects(this.$el);
-                    });
-                },
 
-                // Adds a blank Section (parent)
-                addRootSection() { 
-                    this.items.push(this.newItem(true, false)); // isParent: true, isWorkType: false
-                },
-                
-                // Adds a blank Work Item (sub-parent)
-                addWorkItem(parentItem) {
-                    if (!parentItem.children) parentItem.children = [];
-                    parentItem.children.push(this.newItem(true, false)); // isParent: true, isWorkType: false
-                    parentItem.open = true;
-                },
-                
-                // Adds a blank AHS Item (line item)
-                addAHSItem(parentItem) {
-                    if (!parentItem.children) parentItem.children = [];
-                    parentItem.children.push(this.newItem(false, false)); // isParent: false, isWorkType: false
-                    parentItem.open = true;
-                    this.$nextTick(() => { 
-                        this.initializeAllSelects(this.$el);
-                    });
-                },
-                
-                removeItem(itemToRemove) {
-                    const findAndRemove = (items, targetId) => {
-                        for (let i = 0; i < items.length; i++) {
-                            if (items[i].id === targetId) {
-                                this.destroyItemSelects(items[i]);
-                                items.splice(i, 1);
-                                return true;
-                            }
-                            if (items[i].children && items[i].children.length > 0) {
-                                if (findAndRemove(items[i].children, targetId)) return true;
-                            }
-                        }
-                        return false;
-                    };
-                    findAndRemove(this.items, itemToRemove.id);
-                },
-                
-                newItem(isParent = false, isWorkType = false) { 
-                    return { 
-                        id: `temp_${Date.now()}_${Math.random()}`, 
-                        unit_rate_analysis_id: null, 
-                        description: '', 
-                        item_code: '', 
-                        uom: '', 
-                        quantity: isParent ? null : 0, 
-                        unit_price: isParent ? null : 0, 
-                        children: [], 
-                        open: true, 
-                        isParent: isParent,
-                        isWorkType: isWorkType
-                    };
-                },
-                
-                toggleChildren(item) {
-                    item.open = !item.open;
-                },
-                
-                linkAHS(item, event) {
-                    const selectedOption = event.target.options[event.target.selectedIndex];
-                    const selectedId = event.target.value;
+                    if (workItem.unit_rate_analyses?.length > 0) {
+                        workItem.unit_rate_analyses.forEach(ahs => {
+                            let newAhsItem = this.newItem(false, false, 'ahs');
+                            Object.assign(newAhsItem, {
+                                unit_rate_analysis_id: ahs.id,
+                                description: ahs.name,
+                                item_code: ahs.code,
+                                uom: ahs.unit,
+                                unit_price: parseFloat(ahs.total_cost) || 0,
+                                quantity: 1
+                            });
+                            newWorkItem.children.push(newAhsItem);
+                        });
+                    }
 
-                    if (selectedId && selectedOption.hasAttribute('data-cost')) {
-                        // This is the correct way: read from the option's data attributes
-                        item.description = selectedOption.getAttribute('data-name');
-                        item.item_code = selectedOption.getAttribute('data-code');
-                        item.uom = selectedOption.getAttribute('data-unit');
-                        item.unit_price = parseFloat(selectedOption.getAttribute('data-cost')) || 0;
-                        item.unit_rate_analysis_id = selectedId;
-                    } else {
-                        // This is the "Select AHS Item" (blank) option
-                        item.description = '';
-                        item.item_code = '';
-                        item.uom = '';
-                        item.unit_price = 0;
-                        item.unit_rate_analysis_id = null;
-                    }
-                },
-                
-                calculateItemTotal(item) {
-                    if (item.isParent) {
-                        item.quantity = null;
-                        item.unit_price = null;
-                        if (!item.children) item.children = [];
-                        return item.children.reduce((sum, child) => sum + this.calculateItemTotal(child), 0);
-                    } else {
-                        if (item.quantity === null) item.quantity = 0;
-                        return (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0);
-                    }
-                },
-                
-                get grandTotal() {
-                    return this.items.reduce((sum, item) => sum + this.calculateItemTotal(item), 0);
-                },
-                
-                formatCurrency(value) {
-                    if (isNaN(value)) return 'Rp 0'; 
-                    return parseFloat(value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 2 });
-                },
-                
-                initializeAllSelects(container) {
-                    if (typeof TomSelect === 'undefined') return;
-                    container.querySelectorAll('.ahs-select:not(.tomselected)').forEach(el => {
-                        this.initializeSelects(el, true);
-                    });
-                    container.querySelectorAll('select:not(.ahs-select):not(.tomselected)').forEach(el => {
-                        this.initializeSelects(el, false);
-                    });
-                },
+                    newWorkTypeItem.children.push(newWorkItem);
+                });
+            }
 
-                initializeSelects(element, useTomSelect) {
-                    if (typeof TomSelect === 'undefined') return;
-                    if (element && !element.tomselect) { 
-                        if (useTomSelect) {
-                            this.initSelectCounter++; 
-                            if (!element.id) { element.id = `tomselect-ahs-${this.initSelectCounter}`; } 
-                            new TomSelect(element, { create: false, sortField: { field: "text", direction: "asc" } }); 
-                        } else {
-                            new TomSelect(element, { create: false });
-                        }
+            targetArray.push(newWorkTypeItem);
+            this.$nextTick(() => this.initializeAllSelects(this.$el));
+        },
+
+        addWorkItem(parentItem) {
+            if (parentItem.type === 'ahs') {
+                alert('Cannot add Work Item under AHS.');
+                return;
+            }
+
+            if (parentItem.type !== 'work_type') {
+                alert('Work Items can only be added under a Work Type.');
+                return;
+            }
+
+            parentItem.children.push(this.newItem(true, false, 'work_item'));
+            parentItem.open = true;
+        },
+
+        addWorkItemFromLibrary(workItemId, targetArray, parentType = null) {
+            if (!workItemId) return;
+            if (parentType && parentType !== 'work_type') {
+                alert('Work Items can only be added under a Work Type.');
+                return;
+            }
+
+            const workItem = this.library.workItems.find(wi => wi.id == workItemId);
+            if (!workItem) return;
+
+            let newWorkItem = this.newItem(true, false, 'work_item');
+            newWorkItem.description = workItem.name;
+
+            if (workItem.unit_rate_analyses?.length > 0) {
+                workItem.unit_rate_analyses.forEach(ahs => {
+                    let newAhsItem = this.newItem(false, false, 'ahs');
+                    Object.assign(newAhsItem, {
+                        unit_rate_analysis_id: ahs.id,
+                        description: ahs.name,
+                        item_code: ahs.code,
+                        uom: ahs.unit,
+                        unit_price: parseFloat(ahs.total_cost) || 0,
+                        quantity: 1
+                    });
+                    newWorkItem.children.push(newAhsItem);
+                });
+            }
+
+            targetArray.push(newWorkItem);
+            newWorkItem.open = true;
+            this.$nextTick(() => this.initializeAllSelects(this.$el));
+        },
+
+        addAHSItem(parentItem) {
+            if (!['sub_project', 'work_type', 'work_item', null].includes(parentItem.type)) {
+                alert('AHS can only be added under Work Type, Work Item, or top-level Section.');
+                return;
+            }
+            if (!parentItem.children) parentItem.children = [];
+            parentItem.children.push(this.newItem(false, false, 'ahs'));
+            parentItem.open = true;
+            this.$nextTick(() => this.initializeAllSelects(this.$el));
+        },
+
+        /** ------------------------------
+         * REMOVE + TOGGLE
+         * ------------------------------ */
+        removeItem(itemToRemove) {
+            const findAndRemove = (items, targetId) => {
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].id === targetId) {
+                        this.destroyItemSelects(items[i]);
+                        items.splice(i, 1);
+                        return true;
                     }
-                },
-                
-                destroySelect(element) {
-                    if (element && element.tomselect) { element.tomselect.destroy(); }
-                },
-                
-                destroyItemSelects(item) {
-                    if (item.children && item.children.length > 0) { 
-                        item.children.forEach(child => this.destroyItemSelects(child)); 
-                    }
-                    let el = document.getElementById(`ahs_id_${item.id}`);
-                    if (el) this.destroySelect(el);
-                    
-                    let el2 = document.getElementById(`desc_${item.id}`);
-                    if (el2 && el2.nextElementSibling && el2.nextElementSibling.tomselect) {
-                        this.destroySelect(el2.nextElementSibling);
+                    if (items[i].children?.length) {
+                        if (findAndRemove(items[i].children, targetId)) return true;
                     }
                 }
+                return false;
+            };
+            findAndRemove(this.items, itemToRemove.id);
+        },
+
+        toggleChildren(item) {
+            item.open = !item.open;
+        },
+
+        /** ------------------------------
+         * UTILITIES
+         * ------------------------------ */
+        newItem(isParent = false, isWorkType = false, type = null) {
+            return {
+                id: `temp_${Date.now()}_${Math.random()}`,
+                type: type, // 'sub_project', 'work_type', 'work_item', 'ahs'
+                unit_rate_analysis_id: null,
+                description: '',
+                item_code: '',
+                uom: '',
+                quantity: isParent ? null : 0,
+                unit_price: isParent ? null : 0,
+                children: [],
+                open: true,
+                isParent,
+                isWorkType
+            };
+        },
+
+        linkAHS(item, event) {
+            const selected = event.target.options[event.target.selectedIndex];
+            const id = event.target.value;
+            if (id && selected?.dataset.cost) {
+                item.description = selected.dataset.name;
+                item.item_code = selected.dataset.code;
+                item.uom = selected.dataset.unit;
+                item.unit_price = parseFloat(selected.dataset.cost) || 0;
+                item.unit_rate_analysis_id = id;
+            } else {
+                Object.assign(item, {
+                    description: '',
+                    item_code: '',
+                    uom: '',
+                    unit_price: 0,
+                    unit_rate_analysis_id: null
+                });
             }
+        },
+
+        calculateItemTotal(item) {
+            if (item.isParent) {
+                return (item.children || []).reduce((sum, c) => sum + this.calculateItemTotal(c), 0);
+            }
+            return (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0);
+        },
+
+        get grandTotal() {
+            return this.items.reduce((sum, item) => sum + this.calculateItemTotal(item), 0);
+        },
+
+        formatCurrency(val) {
+            if (isNaN(val)) return 'Rp 0';
+            return parseFloat(val).toLocaleString('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
+            });
+        },
+
+        /** ------------------------------
+         * SELECT INIT + CLEANUP
+         * ------------------------------ */
+        initializeAllSelects(container) {
+            if (typeof TomSelect === 'undefined') return;
+            container.querySelectorAll('.ahs-select:not(.tomselected)').forEach(el => {
+                this.initializeSelects(el, true);
+            });
+            container.querySelectorAll('select:not(.ahs-select):not(.tomselected)').forEach(el => {
+                this.initializeSelects(el, false);
+            });
+        },
+
+        initializeSelects(el, useTomSelect) {
+            if (typeof TomSelect === 'undefined') return;
+            if (el && !el.tomselect) {
+                if (useTomSelect) {
+                    this.initSelectCounter++;
+                    if (!el.id) el.id = `tomselect-${this.initSelectCounter}`;
+                    new TomSelect(el, { create: false, sortField: { field: "text", direction: "asc" } });
+                } else {
+                    new TomSelect(el, { create: false });
+                }
+            }
+        },
+
+        destroySelect(el) {
+            if (el?.tomselect) el.tomselect.destroy();
+        },
+
+        destroyItemSelects(item) {
+            (item.children || []).forEach(child => this.destroyItemSelects(child));
+            const el = document.getElementById(`ahs_id_${item.id}`);
+            if (el) this.destroySelect(el);
         }
-    </script>
+    };
+};
+</script>
 @endpush
 </x-app-layout>
