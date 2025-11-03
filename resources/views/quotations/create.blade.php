@@ -423,16 +423,18 @@
                 },
                 
                 linkAHS(item, event) {
+                    const selectedOption = event.target.options[event.target.selectedIndex];
                     const selectedId = event.target.value;
-                    // Use the original ahsLibraryData (this.ahsData)
-                    if (selectedId && this.ahsData[selectedId]) {
-                        const ahsData = this.ahsData[selectedId];
-                        item.description = ahsData.name;
-                        item.item_code = ahsData.code;
-                        item.uom = ahsData.uom; // Fixed: use 'uom' field from ahsData
-                        item.unit_price = parseFloat(ahsData.unit_price) || 0; // Fixed: use 'unit_price'
+
+                    if (selectedId && selectedOption.hasAttribute('data-cost')) {
+                        // This is the correct way: read from the option's data attributes
+                        item.description = selectedOption.getAttribute('data-name');
+                        item.item_code = selectedOption.getAttribute('data-code');
+                        item.uom = selectedOption.getAttribute('data-unit');
+                        item.unit_price = parseFloat(selectedOption.getAttribute('data-cost')) || 0;
                         item.unit_rate_analysis_id = selectedId;
                     } else {
+                        // This is the "Select AHS Item" (blank) option
                         item.description = '';
                         item.item_code = '';
                         item.uom = '';

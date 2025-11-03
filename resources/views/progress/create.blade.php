@@ -1,172 +1,220 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            Log Progress for: {{ $project->quotation->project_name }}
+            {{ __('Log Project Progress') }}: {{ $project->quotation->project_name }}
         </h2>
     </x-slot>
 
     <div class="py-12">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900">
-
+                
+                {{-- This Alpine.js component will manage all our dynamic rows --}}
+                <div x-data="progressForm({
+                    materials: {{ json_encode(old('materials', [])) }},
+                    labors: {{ json_encode(old('labors', [])) }},
+                    equipments: {{ json_encode(old('equipments', [])) }}
+                })">
                     <form method="POST" action="{{ route('progress.store', $project) }}">
                         @csrf
                         
-                        {{-- Main Progress Details --}}
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                            <div>
-                                <label for="quotation_item_id" class="block font-medium text-sm text-gray-700">Task (WBS Item)</label>
-                                <select id="quotation_item_id" name="quotation_item_id" class="task-select block mt-1 w-full border-gray-300 rounded-md shadow-sm" required>
-                                    <option value="">-- Select a Task --</option>
-                                    @foreach ($tasks as $task)
-                                        <option value="{{ $task->id }}" {{ old('quotation_item_id') == $task->id ? 'selected' : '' }}>
-                                            {{ $task->description }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('quotation_item_id')" class="mt-2" />
-                            </div>
-                            
-                            <div>
-                                <label for="date" class="block font-medium text-sm text-gray-700">Date</label>
-                                <input type="date" id="date" name="date" value="{{ old('date', date('Y-m-d')) }}" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" required>
-                                <x-input-error :messages="$errors->get('date')" class="mt-2" />
+                        {{-- Hidden inputs to store the JSON data --}}
+                        <input type="hidden" name="materials_json" x-model="JSON.stringify(materials)">
+                        <input type="hidden" name="labors_json" x-model="JSON.stringify(labors)">
+                        <input type="hidden" name="equipments_json" x-model="JSON.stringify(equipments)">
+
+                        <div class="p-6 text-gray-900 space-y-6">
+
+                            {{-- 1. MAIN DETAILS --}}
+                            <h3 class="text-lg font-medium text-gray-900 border-b pb-2">Progress Details</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div>
+                                    <x-input-label for="quotation_item_id" :value="__('Project Task (WBS)')" />
+                                    <select id="quotation_item_id" name="quotation_item_id" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" required>
+                                        <option value="">-- Select a task --</option>
+                                        @foreach($tasks as $task)
+                                            <option value="{{ $task->id }}" {{ old('quotation_item_id') == $task->id ? 'selected' : '' }}>
+                                                {{ $task->description }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('quotation_item_id')" class="mt-2" />
+                                </div>
+                                <div>
+                                    <x-input-label for="date" :value="__('Date')" />
+                                    <x-text-input id="date" class="block mt-1 w-full" type="date" name="date" :value="old('date', date('Y-m-d'))" required />
+                                    <x-input-error :messages="$errors->get('date')" class="mt-2" />
+                                </div>
+                                <div>
+                                    <x-input-label for="percent_complete" :value="__('New Percent Complete (%)')" />
+                                    <x-text-input id="percent_complete" class="block mt-1 w-full" type="number" step="0.01" name="percent_complete" :value="old('percent_complete')" required />
+                                    <x-input-error :messages="$errors->get('percent_complete')" class="mt-2" />
+                                </div>
+                                <div class="md:col-span-3">
+                                    <x-input-label for="notes" :value="__('Notes (Optional)')" />
+                                    <textarea id="notes" name="notes" rows="2" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm">{{ old('notes') }}</textarea>
+                                    <x-input-error :messages="$errors->get('notes')" class="mt-2" />
+                                </div>
                             </div>
 
-                            {{-- === THIS IS THE NEW FIELD === --}}
-                            <div>
-                                <label for="percent_complete" class="block font-medium text-sm text-gray-700">New Total Progress (%)</label>
-                                <input type="number" step="0.01" min="0" max="100" id="percent_complete" name="percent_complete" value="{{ old('percent_complete') }}" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" required>
-                                <x-input-error :messages="$errors->get('percent_complete')" class="mt-2" />
-                            </div>
-                            {{-- === END OF NEW FIELD === --}}
-                        </div>
-
-                        <div class="mb-6">
-                            <label for="notes" class="block font-medium text-sm text-gray-700">Notes (Optional)</label>
-                            <textarea id="notes" name="notes" rows="3" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm">{{ old('notes') }}</textarea>
-                            <x-input-error :messages="$errors->get('notes')" class="mt-2" />
-                        </div>
-
-                        {{-- Alpine Component for Dynamic Rows --}}
-                        <div x-data="costLogger()">
-                            
-                            {{-- 1. Materials Used --}}
-                            <h3 class="text-lg font-semibold border-b pb-2 mb-4">Materials Used</h3>
-                            <div class="space-y-4">
+                            {{-- 2. MATERIALS USED --}}
+                            <hr />
+                            <h3 class="text-lg font-medium text-gray-900">Materials Used</h3>
+                            <div class="space-y-2">
                                 <template x-for="(material, index) in materials" :key="index">
-                                    <div class="grid grid-cols-12 gap-4 items-center">
-                                        <div class="col-span-7">
-                                            <label class="sr-only">Material Item</label>
-                                            <select :name="`materials[${index}][inventory_item_id]`" class="item-select block w-full border-gray-300 rounded-md shadow-sm" x-init="initializeSelects($el)">
-                                                <option value="">-- Select Material --</option>
-                                                @foreach ($inventoryItems as $item)
-                                                    <option value="{{ $item->id }}">{{ $item->item_name }} ({{ $item->uom }})</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                        <div class="col-span-3">
-                                            <label class="sr-only">Quantity</label>
-                                            <input type="number" step="0.01" :name="`materials[${index}][quantity_used]`" placeholder="Quantity Used" class="block w-full border-gray-300 rounded-md shadow-sm">
-                                        </div>
-                                        <div class="col-span-2">
-                                            <button type="button" @click="removeMaterial(index)" class="text-red-600 hover:text-red-800 text-sm">Remove</button>
-                                        </div>
+                                    <div class="flex items-center space-x-2">
+                                        <select x-model="material.id" class="tom-select-mat block w-full border-gray-300 text-sm rounded-md shadow-sm" placeholder="Select material...">
+                                            <option value="">Select material...</option>
+                                            @foreach($inventoryItems as $item)
+                                                <option value="{{ $item->id }}">{{ $item->item_name }} ({{ $item->uom }})</option>
+                                            @endforeach
+                                        </select>
+                                        <x-text-input type="number" step="0.01" x-model.number="material.quantity" class="block w-32 text-sm" placeholder="Qty" />
+                                        <button type="button" @click="removeMaterial(index)" class="text-red-500 hover:text-red-700 p-1">✖</button>
                                     </div>
                                 </template>
                             </div>
-                            <button type="button" @click="addMaterial" class="mt-4 text-sm text-blue-600 hover:text-blue-800">+ Add Material</button>
-                            <x-input-error :messages="$errors->get('materials')" class="mt-2" />
+                            <button type="button" @click="addMaterial()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Add Material</button>
 
-                            {{-- 2. Labor Used --}}
-                            <h3 class="text-lg font-semibold border-b pb-2 mb-4 mt-8">Labor Used</h3>
-                            <div class="space-y-4">
+                            {{-- 3. LABOR USED --}}
+                            <hr />
+                            <h3 class="text-lg font-medium text-gray-900">Labor Used</h3>
+                            <div class="space-y-2">
                                 <template x-for="(labor, index) in labors" :key="index">
-                                    <div class="grid grid-cols-12 gap-4 items-center">
-                                        <div class="col-span-7">
-                                            <label class="sr-only">Labor Type</label>
-                                            <select :name="`labors[${index}][labor_rate_id]`" class="item-select block w-full border-gray-300 rounded-md shadow-sm" x-init="initializeSelects($el)">
-                                                <option value="">-- Select Labor --</option>
-                                                @foreach ($laborRates as $rate)
-                                                    <option value="{{ $rate->id }}">{{ $rate->labor_type }} ({{ $rate->unit }})</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                        <div class="col-span-3">
-                                            <label class="sr-only">Quantity</label>
-                                            <input type="number" step="0.01" :name="`labors[${index}][quantity_used]`" placeholder="Quantity Used" class="block w-full border-gray-300 rounded-md shadow-sm">
-                                        </div>
-                                        <div class="col-span-2">
-                                            <button type="button" @click="removeLabor(index)" class="text-red-600 hover:text-red-800 text-sm">Remove</button>
-                                        </div>
+                                    <div class="flex items-center space-x-2">
+                                        <select x-model="labor.id" class="tom-select-lab block w-full border-gray-300 text-sm rounded-md shadow-sm" placeholder="Select labor...">
+                                            <option value="">Select labor...</option>
+                                            @foreach($laborRates as $rate)
+                                                <option value="{{ $rate->id }}">{{ $rate->labor_type }} ({{ $rate->unit }})</option>
+                                            @endforeach
+                                        </select>
+                                        <x-text-input type="number" step="0.01" x-model.number="labor.quantity" class="block w-32 text-sm" placeholder="Qty" />
+                                        <button type="button" @click="removeLabor(index)" class="text-red-500 hover:text-red-700 p-1">✖</button>
                                     </div>
                                 </template>
                             </div>
-                            <button type="button" @click="addLabor" class="mt-4 text-sm text-blue-600 hover:text-blue-800">+ Add Labor</button>
-                            <x-input-error :messages="$errors->get('labors')" class="mt-2" />
+                            <button type="button" @click="addLabor()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Add Labor</button>
+
+                            {{-- 4. EQUIPMENT USED (NEW) --}}
+                            <hr />
+                            <h3 class="text-lg font-medium text-gray-900">Equipment Used</h3>
+                            <div class="space-y-2">
+                                <template x-for="(equipment, index) in equipments" :key="index">
+                                    <div class="flex items-center space-x-2">
+                                        {{-- Equipment Dropdown --}}
+                                        <select x-model="equipment.id" class="tom-select-eq block w-full border-gray-300 text-sm rounded-md shadow-sm" placeholder="Select equipment...">
+                                            <option value="">Select equipment...</option>
+                                            @foreach($equipments as $eq)
+                                                <option value="{{ $eq->id }}">
+                                                    {{ $eq->name }} 
+                                                    (@if($eq->status == 'rented')
+                                                        Rp {{ number_format($eq->rental_rate, 0) }}/{{ $eq->rental_rate_unit }}
+                                                    @else
+                                                        Rp {{ number_format($eq->base_rental_rate, 0) }}/{{ $eq->base_rental_rate_unit }}
+                                                    @endif)
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        {{-- Quantity Input --}}
+                                        <x-text-input type="number" step="0.01" x-model.number="equipment.quantity" class="block w-24 text-sm" placeholder="Qty" />
+                                        {{-- Unit Dropdown --}}
+                                        <select x-model="equipment.unit" class="block w-28 border-gray-300 text-sm rounded-md shadow-sm">
+                                            <option value="Hour">Hour</option>
+                                            <option value="Day">Day</option>
+                                            <option value="Week">Week</option>
+                                        </select>
+                                        {{-- Remove Button --}}
+                                        <button type="button" @click="removeEquipment(index)" class="text-red-500 hover:text-red-700 p-1">✖</button>
+                                    </div>
+                                </template>
+                            </div>
+                            <button type="button" @click="addEquipment()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Add Equipment</button>
 
                         </div>
 
-                        {{-- Form Actions --}}
-                        <div class="flex items-center justify-end mt-8 border-t pt-6">
-                            <a href="{{ route('projects.show', $project) }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50">
+                        {{-- FORM ACTIONS --}}
+                        <div class="flex items-center justify-end p-6 bg-gray-50 border-t">
+                            <a href="{{ route('projects.show', $project) }}" class="text-sm text-gray-600 hover:text-gray-900 rounded-md mr-4">
                                 {{ __('Cancel') }}
                             </a>
-                            <button type="submit" class="ml-4 inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700">
-                                {{ __('Log Progress') }}
-                            </button>
+                            <x-primary-button>
+                                {{ __('Save Progress') }}
+                            </x-primary-button>
                         </div>
                     </form>
                 </div>
+
             </div>
         </div>
     </div>
 
-    @push('head-scripts')
+    @push('scripts')
     <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('costLogger', () => ({
-                materials: [],
-                labors: [],
-                
-                init() {
-                    @if(old('materials'))
-                        this.materials = @json(old('materials')).map(m => ({...m}));
-                    @else
-                        this.addMaterial();
-                    @endif
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('progressForm', (initialData) => ({
+            materials: initialData.materials,
+            labors: initialData.labors,
+            equipments: initialData.equipments,
+            tomSelects: { mat: [], lab: [], eq: [] },
 
-                    @if(old('labors'))
-                        this.labors = @json(old('labors')).map(l => ({...l}));
-                    @else
-                        this.addLabor();
-                    @endif
+            init() {
+                // Initialize existing TomSelects on page load (e.g., from validation error)
+                this.$nextTick(() => {
+                    this.materials.forEach((_, i) => this.initTomSelect('mat', i));
+                    this.labors.forEach((_, i) => this.initTomSelect('lab', i));
+                    this.equipments.forEach((_, i) => this.initTomSelect('eq', i));
+                });
+            },
 
-                    this.initializeSelects(document.querySelector('.task-select'));
-                },
+            // --- Material Methods ---
+            addMaterial() {
+                this.materials.push({ id: '', quantity: '' });
+                this.$nextTick(() => this.initTomSelect('mat', this.materials.length - 1));
+            },
+            removeMaterial(index) {
+                this.destroyTomSelect('mat', index);
+                this.materials.splice(index, 1);
+            },
 
-                addMaterial() {
-                    this.materials.push({});
-                },
-                removeMaterial(index) {
-                    this.materials.splice(index, 1);
-                },
+            // --- Labor Methods ---
+            addLabor() {
+                this.labors.push({ id: '', quantity: '' });
+                this.$nextTick(() => this.initTomSelect('lab', this.labors.length - 1));
+            },
+            removeLabor(index) {
+                this.destroyTomSelect('lab', index);
+                this.labors.splice(index, 1);
+            },
 
-                addLabor() {
-                    this.labors.push({});
-                },
-                removeLabor(index) {
-                    this.labors.splice(index, 1);
-                },
+            // --- Equipment Methods (NEW) ---
+            addEquipment() {
+                this.equipments.push({ id: '', quantity: '', unit: 'Day' }); // Default to 'Day'
+                this.$nextTick(() => this.initTomSelect('eq', this.equipments.length - 1));
+            },
+            removeEquipment(index) {
+                this.destroyTomSelect('eq', index);
+                this.equipments.splice(index, 1);
+            },
 
-                initializeSelects(element) {
-                    if (typeof TomSelect !== 'undefined' && element && !element.tomselect) {
-                        new TomSelect(element, { create: false, sortField: { field: "text", direction: "asc" } });
-                    }
+            // --- TomSelect Helpers ---
+            initTomSelect(type, index) {
+                if (typeof TomSelect === 'undefined') return;
+                const el = this.$el.querySelectorAll(`.tom-select-${type}`)[index];
+                if (el && !el.tomselect) {
+                    this.tomSelects[type][index] = new TomSelect(el, {
+                        create: false,
+                        sortField: { field: "text", direction: "asc" }
+                    });
                 }
-            }));
-        });
+            },
+            destroyTomSelect(type, index) {
+                if (this.tomSelects[type][index]) {
+                    this.tomSelects[type][index].destroy();
+                    this.tomSelects[type].splice(index, 1);
+                }
+            }
+        }));
+    });
     </script>
     @endpush
 </x-app-layout>

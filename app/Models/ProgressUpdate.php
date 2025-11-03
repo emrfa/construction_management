@@ -45,4 +45,9 @@ class ProgressUpdate extends Model
         return $this->hasMany(LaborUsage::class);
     }
 
+    public function equipmentUsages()
+    {
+        return $this->hasMany(EquipmentUsage::class);
+    }
+
 }

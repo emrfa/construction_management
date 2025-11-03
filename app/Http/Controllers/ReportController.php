@@ -124,6 +124,7 @@ class ReportController extends Controller
             'quotation.allItems.unitRateAnalysis', // Load AHS for budget
             'quotation.allItems.progressUpdates.materialUsages', // Load material costs
             'quotation.allItems.progressUpdates.laborUsages', // Load labor
+            'quotation.allItems.progressUpdates.equipmentUsages', // Load equipment
         ]);
 
         $projectBudget = (float) $project->total_budget;
@@ -211,8 +212,9 @@ class ReportController extends Controller
             foreach ($task->progressUpdates as $update) {
                 $materialCost = $update->materialUsages->sum(fn($usage) => $usage->quantity_used * $usage->unit_cost);
                 $laborCost = $update->laborUsages->sum(fn($usage) => $usage->quantity_used * $usage->unit_cost);
+                $equipmentCost = $update->equipmentUsages->sum('total_cost');
 
-                $dailyCost = $materialCost + $laborCost;
+                $dailyCost = $materialCost + $laborCost + $equipmentCost;
                 if ($dailyCost == 0) continue;
 
                 // --- FIX 1: Convert the Carbon object to a string key ---

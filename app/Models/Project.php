@@ -104,25 +104,19 @@ class Project extends Model
 
     public function getActualCostAttribute()
     {
-        $totalCost = 0;
-        // Eager load quotation with all items, progress updates, and material usages
-        // This might be heavy, consider optimizing later if needed
-        $this->loadMissing('quotation.allItems.progressUpdates.materialUsages');
+        // 1. Eager load the root quotation items.
+        // We already fixed the 'actual_cost' on the QuotationItem model,
+        // so we can just trust its calculation.
+        $this->loadMissing('quotation.items');
 
-        if ($this->quotation) {
-            foreach ($this->quotation->allItems as $item) {
-                // Only sum costs from leaf nodes (items without children)
-                // to avoid double counting parent subtotals
-                if ($item->children->isEmpty()) {
-                    foreach ($item->progressUpdates as $update) {
-                        foreach ($update->materialUsages as $usage) {
-                            $totalCost += (float)$usage->quantity_used * (float)$usage->unit_cost;
-                        }
-                    }
-                }
-            }
+        if (!$this->quotation) {
+            return 0;
         }
-        return $totalCost;
+
+        // 2. Sum the 'actual_cost' attribute of all root items.
+        // Each root item will recursively sum its children,
+        // giving us the total for the entire project.
+        return $this->quotation->items->sum('actual_cost');
     }
 
     // HELPER: Get remaining project budget

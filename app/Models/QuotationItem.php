@@ -86,20 +86,26 @@ class QuotationItem extends Model
 
     // HELPER: Get the actual cost incurred for this item
     public function getActualCostAttribute()
-        {
-            if ($this->children->isNotEmpty()) {
+    {
+        if ($this->children->isNotEmpty()) {
             if (!$this->relationLoaded('children')) {
-                $this->load('children');
+                // PERFORMANCE FIX: This stops N+1 queries on child items
+                $this->loadMissing([
+                    'children.progressUpdates.materialUsages',
+                    'children.progressUpdates.laborUsages',
+                    'children.progressUpdates.equipmentUsages'
+                ]);
             }
             return $this->children->sum('actual_cost');
         }
 
         // If it's a line item, calculate based on material and labor usage
         // We must Eager Load the relationships
-        $this->loadMissing('progressUpdates.materialUsages', 'progressUpdates.laborUsages');
+        $this->loadMissing('progressUpdates.materialUsages', 'progressUpdates.laborUsages', 'progressUpdates.equipmentUsages');
 
         $materialCost = 0;
         $laborCost = 0;
+        $equipmentCost = 0;
 
         foreach ($this->progressUpdates as $update) {
             $materialCost += $update->materialUsages->sum(function($usage) {
@@ -109,9 +115,10 @@ class QuotationItem extends Model
             $laborCost += $update->laborUsages->sum(function($usage) {
                 return $usage->quantity_used * $usage->unit_cost;
             });
+            $equipmentCost += $update->equipmentUsages->sum('total_cost');
         }
 
-        return $materialCost + $laborCost;
+        return $materialCost + $laborCost + $equipmentCost;
     }
 
     // HELPER: Get remaining budget for this item
