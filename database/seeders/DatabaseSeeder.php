@@ -24,7 +24,7 @@ class DatabaseSeeder extends Seeder
 
         // 2. Create your default Admin User
         // firstOrCreate prevents errors if the user already exists.
-        $adminUser = User::factory()->firstOrCreate(
+        $adminUser = User::firstOrCreate(
             ['email' => 'admin@mail.com'], // Find user by this email
             [ // If not found, create with this data
                 'name' => 'Admin User',
