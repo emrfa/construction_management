@@ -37,7 +37,7 @@ class DatabaseSeeder extends Seeder
         $adminUser->assignRole($adminRole);
         
         // (Optional) Create a default Site Manager user for testing
-        $siteManagerUser = User::factory()->firstOrCreate(
+        $siteManagerUser = User::firstOrCreate(
             ['email' => 'sitemanager@mail.com'],
             [
                 'name' => 'Site Manager',
