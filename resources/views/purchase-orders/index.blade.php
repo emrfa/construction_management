@@ -35,7 +35,7 @@
                                             {{ $po->po_number }}
                                         </a>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">{{ $po->supplier->name }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">{{ $po->supplier?->name ?? 'N/A' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">{{ \Carbon\Carbon::parse($po->order_date)->format('m/d/Y') }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">{{ number_format($po->total_amount, 0, ',', '.') }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">

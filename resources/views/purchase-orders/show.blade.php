@@ -36,9 +36,7 @@
                     <div class="grid grid-cols-3 gap-4 mb-6">
                         <div>
                             <strong class="text-gray-600">Supplier:</strong>
-                            <p class="text-lg">{{ $purchaseOrder->supplier->name }}</p>
-                            <p class="text-sm">{{ $purchaseOrder->supplier->contact_person }}</p>
-                            <p class="text-sm">{{ $purchaseOrder->supplier->phone }}</p>
+                            <p class="text-lg">{{ $purchaseOrder->supplier?->name ?? 'Not Assigned' }}</p>
                         </div>
                         <div>
                             <strong class="text-gray-600">Dates:</strong>

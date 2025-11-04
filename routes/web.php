@@ -21,7 +21,8 @@ use App\Http\Controllers\WorkTypeController;
 use App\Http\Controllers\WorkItemController;
 use App\Http\Controllers\DashboardController;   
 use App\Http\Controllers\ItemCategoryController;
-
+use App\Http\Controllers\UserRoleController;
+use App\Http\Controllers\RoleController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -36,6 +37,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    Route::middleware(['permission:manage users'])->group(function () {
+        Route::get('/users', [UserRoleController::class, 'index'])->name('users.index');
+        Route::get('/users/{user}/edit', [UserRoleController::class, 'edit'])->name('users.edit');
+        Route::put('/users/{user}', [UserRoleController::class, 'update'])->name('users.update');
+
+        Route::resource('roles', RoleController::class);
+    });
+
+
 
     // Client Management
     Route::resource('clients', ClientController::class);
