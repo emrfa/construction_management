@@ -26,6 +26,8 @@ use App\Http\Controllers\RoleController;
 
 use Illuminate\Support\Facades\Route;
 
+use App\Models\User; //temp route
+use Spatie\Permission\Models\Role; //tempp route
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -34,6 +36,18 @@ Route::get('/', function () {
 Route::get('/dashboard', DashboardController::class)->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+//temp route need to be removed
+    Route::get('/make-me-admin-temp-fix', function () {
+        if (auth()->user()) {
+            $user = auth()->user();
+            $adminRole = Role::findByName('Admin');
+            $user->assignRole($adminRole);
+            
+            return "SUCCESS: You ({$user->email}) have been assigned the 'Admin' role. PLEASE REMOVE THIS ROUTE NOW.";
+        }
+        return "ERROR: You are not logged in.";
+    });
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
