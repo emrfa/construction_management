@@ -51,6 +51,11 @@ class MaterialRequest extends Model
         return $this->hasMany(MaterialRequestItem::class);
     }
 
+    public function purchaseOrders()
+    {
+        return $this->hasMany(PurchaseOrder::class);
+    }
+
     // Auto-generate request_code
     protected static function boot()
     {

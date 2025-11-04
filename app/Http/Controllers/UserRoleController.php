@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use IlluminateAgnostic\Arr;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules;
 
 class UserRoleController extends Controller
 {
@@ -15,10 +16,48 @@ class UserRoleController extends Controller
      */
     public function index()
     {
-        // Get all users and load their roles
         $users = User::with('roles')->latest()->paginate(20);
-
         return view('users.index', compact('users'));
+    }
+
+    /**
+     * Show the form for creating a new user.
+     */
+    public function create()
+    {
+        $roles = Role::all();
+        return view('users.create', compact('roles'));
+    }
+
+    /**
+     * Store a newly created user in storage.
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'roles' => 'nullable|array'
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+            ]);
+
+            $user->syncRoles($validated['roles'] ?? []);
+            
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Error creating user: ' + $e->getMessage());
+        }
+
+        return redirect()->route('users.index')->with('success', 'User created successfully.');
     }
 
     /**
@@ -26,9 +65,7 @@ class UserRoleController extends Controller
      */
     public function edit(User $user)
     {
-        // Get all roles
         $roles = Role::all();
-        // Get the names of the roles this user has
         $userRoles = $user->roles->pluck('name')->all();
 
         return view('users.edit', compact('user', 'roles', 'userRoles'));
@@ -39,16 +76,53 @@ class UserRoleController extends Controller
      */
     public function update(Request $request, User $user)
     {
-        // 1. Validate the input
         $validated = $request->validate([
-            'roles' => 'nullable|array' // 'roles' must be an array (even if empty)
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class. ',email,' . $user->id],
+            'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
+            'roles' => 'nullable|array'
         ]);
 
-        // 2. Sync the roles
-        // This command detaches any old roles and attaches only the new ones.
-        $user->syncRoles($validated['roles'] ?? []);
+        DB::beginTransaction();
+        try {
+            // Update user details
+            $user->name = $validated['name'];
+            $user->email = $validated['email'];
+            
+            // Only update password if one was provided
+            if (!empty($validated['password'])) {
+                $user->password = Hash::make($validated['password']);
+            }
+            $user->save();
 
-        // 3. Redirect back
-        return redirect()->route('users.index')->with('success', 'User roles updated successfully.');
+            // Sync roles
+            $user->syncRoles($validated['roles'] ?? []);
+            
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Error updating user: ' + $e->getMessage());
+        }
+
+        return redirect()->route('users.index')->with('success', 'User updated successfully.');
+    }
+
+    /**
+     * Remove the specified user from storage.
+     */
+    public function destroy(User $user)
+    {
+        // Don't let an admin delete themselves
+        if ($user->id === auth()->id()) {
+            return back()->with('error', 'You cannot delete your own account.');
+        }
+
+        // Optional: Don't let anyone delete the original Admin user
+        if ($user->email === 'admin@mail.com') {
+             return back()->with('error', 'You cannot delete the default admin user.');
+        }
+        
+        $user->delete();
+        return redirect()->route('users.index')->with('success', 'User deleted successfully.');
     }
 }

@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Edit User') }}: {{ $user->name }}
+            {{ __('Create New User') }}
         </h2>
     </x-slot>
 
@@ -10,41 +10,39 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
                     
-                    <form method="POST" action="{{ route('users.update', $user) }}">
+                    <form method="POST" action="{{ route('users.store') }}">
                         @csrf
-                        @method('PUT')
                         
                         <div>
                             <x-input-label for="name" :value="__('Name')" />
-                            <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name', $user->name)" required autofocus />
+                            <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name')" required autofocus />
                             <x-input-error :messages="$errors->get('name')" class="mt-2" />
                         </div>
 
                         <div class="mt-4">
                             <x-input-label for="email" :value="__('Email')" />
-                            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email', $user->email)" required />
+                            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required />
                             <x-input-error :messages="$errors->get('email')" class="mt-2" />
                         </div>
 
                         <div class="mt-4">
-                            <x-input-label for="password" :value="__('New Password (Optional)')" />
+                            <x-input-label for="password" :value="__('Password')" />
                             <x-text-input id="password" class="block mt-1 w-full"
                                             type="password"
                                             name="password"
-                                            autocomplete="new-password" />
-                            <p class="text-xs text-gray-500 mt-1">Leave blank to keep the current password.</p>
+                                            required autocomplete="new-password" />
                             <x-input-error :messages="$errors->get('password')" class="mt-2" />
                         </div>
 
                         <div class="mt-4">
-                            <x-input-label for="password_confirmation" :value="__('Confirm New Password')" />
+                            <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
                             <x-text-input id="password_confirmation" class="block mt-1 w-full"
                                             type="password"
-                                            name="password_confirmation" />
+                                            name="password_confirmation" required />
                             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
                         </div>
 
-                        <div class="mt-6 border-t pt-6">
+                        <div class="mt-6">
                             <label class="block font-medium text-lg text-gray-700">Roles</label>
                             
                             <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -54,13 +52,7 @@
                                                name="roles[]" 
                                                type="checkbox" 
                                                value="{{ $role->name }}"
-                                               class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
-                                               {{ in_array($role->name, $userRoles) ? 'checked' : '' }}
-                                               
-                                               @if($role->name === 'Admin' && $user->email === 'admin@example.com')
-                                                   disabled
-                                               @endif
-                                        >
+                                               class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
                                         <label for="role_{{ $role->id }}" class="ml-2 block text-sm text-gray-900">
                                             {{ $role->name }}
                                         </label>
@@ -76,7 +68,7 @@
                                 {{ __('Cancel') }}
                             </a>
                             <x-primary-button>
-                                {{ __('Update User') }}
+                                {{ __('Create User') }}
                             </x-primary-button>
                         </div>
                     </form>

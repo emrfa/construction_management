@@ -39,9 +39,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::middleware(['permission:manage users'])->group(function () {
-        Route::get('/users', [UserRoleController::class, 'index'])->name('users.index');
-        Route::get('/users/{user}/edit', [UserRoleController::class, 'edit'])->name('users.edit');
-        Route::put('/users/{user}', [UserRoleController::class, 'update'])->name('users.update');
+        
+        Route::resource('users', UserRoleController::class)->except(['show']);
 
         Route::resource('roles', RoleController::class);
     });

@@ -139,9 +139,57 @@
                             </tbody>
                         </table>
                     </div>
-
+                    <div class="mt-6">
+                    <h4 class="font-semibold mb-2 text-gray-800">Associated Purchase Orders</h4>
+                    <div class="overflow-x-auto border rounded">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">PO #</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Supplier</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                @forelse ($materialRequest->purchaseOrders as $po)
+                                    <tr>
+                                        <td class="px-4 py-2 whitespace-nowrap">
+                                            <a href="{{ route('purchase-orders.show', $po) }}" class="text-indigo-600 hover:text-indigo-900 font-medium">
+                                                {{ $po->po_number }}
+                                            </a>
+                                        </td>
+                                        <td class="px-4 py-2 whitespace-nowrap">
+                                            {{ $po->supplier?->name ?? 'N/A' }}
+                                        </td>
+                                        <td class="px-4 py-2 whitespace-nowrap">
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                                @switch($po->status)
+                                                    @case('draft') bg-gray-200 text-gray-800 @break
+                                                    @case('ordered') bg-blue-200 text-blue-800 @break
+                                                    @case('partially_received') bg-yellow-200 text-yellow-800 @break
+                                                    @case('received') bg-green-200 text-green-800 @break
+                                                    @case('cancelled') bg-red-200 text-red-800 @break
+                                                @endswitch">
+                                                {{ ucfirst(str_replace('_', ' ', $po->status)) }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
+                                            <a href="{{ route('purchase-orders.show', $po) }}" class="text-indigo-600 hover:text-indigo-900">View</a>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="px-4 py-2 text-center text-gray-500">
+                                            No Purchase Orders have been created from this request yet.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+                </div>
         </div>
     </div>
 </x-app-layout>

@@ -180,7 +180,8 @@ class MaterialRequestController extends Controller
             'requester',         // User who requested
             'approver',          // User who approved
             'items.inventoryItem', // Material details for each item
-            'items.quotationItem' // WBS item linked
+            'items.quotationItem', // WBS item linked
+            'purchaseOrders.supplier'
         ]);
 
         return view('material-requests.show', compact('materialRequest'));

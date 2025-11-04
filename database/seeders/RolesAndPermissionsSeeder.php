@@ -20,11 +20,13 @@ class RolesAndPermissionsSeeder extends Seeder
         // --- Create All Permissions ---
         $permissions = [
             'manage users',
+            'manage clients',
+            'manage quotations',
             'view all projects', 'view own projects', 'create project', 'edit project', 'delete project',
             'manage billings', 'manage invoices', 'manage payments',
             'manage suppliers', 'manage purchase_orders', 'approve purchase_orders',
             'manage inventory', 'view inventory',
-            'manage ahs_library', 'manage work_types', 'manage equipment', 'manage labor_rates',
+            'manage ahs_library', 'manage work_types','manage work_items', 'manage equipment', 'manage labor_rates',
             'create material_request', 'approve material_request',
             'create progress_update',
         ];
