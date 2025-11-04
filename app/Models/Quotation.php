@@ -5,10 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Quotation extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'client_id',
@@ -76,5 +78,18 @@ class Quotation extends Model
             // Format the new quotation number (e.g., Q-2025-0001)
             $quotation->quotation_no = "Q-{$year}-" . str_pad($number, 4, '0', STR_PAD_LEFT);
         });
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            // Log changes to these specific fields
+            ->logOnly(['project_name', 'status', 'total_estimate'])
+            
+            // Only log if a field has *actually* changed
+            ->logOnlyDirty()
+            
+            // Give a custom description to the log
+            ->setDescriptionForEvent(fn(string $eventName) => "This quotation was {$eventName}");
     }
 }

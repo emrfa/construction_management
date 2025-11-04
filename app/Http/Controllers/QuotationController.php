@@ -182,8 +182,10 @@ class QuotationController extends Controller
         $grandTotal = $this->saveItems($itemsArray, $quotation->id, null);
 
         // 5. Now update the quotation's total_estimate
+        $quotation->disableLogging();
         $quotation->total_estimate = $grandTotal;
         $quotation->save();
+        $quotation->enableLogging();
 
         // 6. Commit the transaction
         DB::commit();
@@ -191,6 +193,9 @@ class QuotationController extends Controller
     } catch (\Exception $e) {
         // 7. If anything went wrong, roll back
         DB::rollBack();
+        if (isset($quotation)) {
+                $quotation->enableLogging();
+            }
         // Optional: return with a specific error message
         return back()->withInput()->withErrors('Error saving quotation: ' . $e->getMessage());
     }
@@ -310,7 +315,12 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
      */
     public function show(Quotation $quotation)
     {
-        $quotation->load('client', 'items.children');
+        $quotation->load([
+        'client', 
+        'items.children', 
+        'activities' => fn($query) => $query->latest(), 
+        'activities.causer'
+    ]);
 
         return view('quotations.show', compact('quotation'));
     }
@@ -489,6 +499,8 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
         $newStatus = $validated['status'];
         $message = 'Status updated successfully.';
 
+        $quotation->disableLogging();
+
         try {
             DB::beginTransaction();
 
@@ -506,6 +518,17 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
                 ]);
                 
                 $message = 'Quotation approved and project created!';
+                activity()
+                   ->on($quotation)
+                   ->by(auth()->user()) 
+                   ->log('Approved'); 
+            } elseif ($newStatus == 'sent') {
+
+                activity()->on($quotation)->by(auth()->user())->log('Sent');
+                
+            } elseif ($newStatus == 'rejected') {
+
+                activity()->on($quotation)->by(auth()->user())->log('Rejected');
             }
             
             // 4. Update the quotation status
@@ -517,6 +540,7 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
         } catch (\Exception $e) {
             DB::rollBack();
             // Return with a specific error
+            $quotation->enableLogging();
             return back()->withErrors('Error updating status: ' . $e->getMessage());
         }
 
