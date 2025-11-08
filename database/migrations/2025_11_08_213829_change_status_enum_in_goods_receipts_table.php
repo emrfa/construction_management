@@ -14,7 +14,7 @@ return new class extends Migration
     {
         // This will change the 'status' column to allow 'received'
         // We set the default to 'draft' as you wanted.
-        DB::statement("ALTER TABLE goods_receipts MODIFY COLUMN status ENUM('draft', 'received') NOT NULL DEFAULT 'draft'");
+       $table->enum('status', ['draft', 'received'])->default('draft')->change();
         
         // This makes sure any old 'posted' values are updated to 'received'
         DB::table('goods_receipts')
@@ -28,10 +28,9 @@ return new class extends Migration
     public function down(): void
     {
         // This reverts it back, just in case
-        DB::statement("ALTER TABLE goods_receipts MODIFY COLUMN status ENUM('draft', 'posted') NOT NULL DEFAULT 'draft'");
-        
+       $table->enum('status', ['draft', 'posted'])->default('posted')->change();
         // Revert the data
-        DB::table('goods_receipts')
+       DB::table('goods_receipts')
             ->where('status', 'received')
             ->update(['status' => 'posted']);
     }
