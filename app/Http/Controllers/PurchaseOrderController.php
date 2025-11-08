@@ -9,6 +9,8 @@ use App\Models\PurchaseOrderItem;
 use App\Models\StockTransaction;
 use App\Models\MaterialRequest;
 use App\Models\MaterialRequestItem;
+use App\Models\GoodsReceipt;
+use App\Models\GoodsReceiptItem;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,27 +45,52 @@ class PurchaseOrderController extends Controller
             $validatedData = $request->validate([
                 'supplier_id' => 'required|exists:suppliers,id',
                 'order_date' => 'required|date',
-                'expected_delivery_date' => 'required|date|after_or_equal:order_date',
+                'expected_delivery_date' => 'nullable|date|after_or_equal:order_date', // Made nullable
+                'items_json' => 'required|json', // Use items_json for consistency
+            ]);
+
+            $itemsArray = json_decode($validatedData['items_json'], true);
+
+            $itemsValidator = \Illuminate\Support\Facades\Validator::make(['items' => $itemsArray], [
                 'items' => 'required|array|min:1',
                 'items.*.inventory_item_id' => 'required|exists:inventory_items,id',
                 'items.*.quantity_ordered' => 'required|numeric|min:0.01',
                 'items.*.unit_cost' => 'required|numeric|min:0',
             ]);
 
+            if ($itemsValidator->fails()) {
+                return back()
+                       ->withInput($request->except('items_json') + ['items_json' => $validatedData['items_json']])
+                       ->withErrors($itemsValidator);
+            }
+            $validatedItems = $itemsValidator->validated()['items'];
+
             $grandTotal = 0;
+            $markAsOrdered = $request->has('mark_ordered') && $request->input('mark_ordered') == '1';
+            $status = $markAsOrdered ? 'ordered' : 'draft';
 
             try {
                 DB::beginTransaction();
+
+                if ($markAsOrdered) {
+                    if(empty($validatedData['supplier_id'])) {
+                         throw new \Exception("Cannot mark as ordered without selecting a supplier.");
+                    }
+                     $itemsWithZeroCost = collect($validatedItems)->filter(fn($item) => $item['unit_cost'] <= 0)->count();
+                     if ($itemsWithZeroCost > 0) {
+                        throw new \Exception("Cannot mark as ordered when items have zero unit cost.");
+                     }
+                }
 
                 $purchaseOrder = PurchaseOrder::create([
                     'supplier_id' => $validatedData['supplier_id'],
                     'order_date' => $validatedData['order_date'],
                     'expected_delivery_date' => $validatedData['expected_delivery_date'],
-                    'status' => 'draft', // Default status
-                    'total_amount' => 0, // Calculate below
+                    'status' => $status,
+                    'total_amount' => 0, // Will be updated
                 ]);
 
-                foreach ($validatedData['items'] as $itemData) {
+                foreach ($validatedItems as $itemData) {
                     $subtotal = $itemData['quantity_ordered'] * $itemData['unit_cost'];
                     PurchaseOrderItem::create([
                         'purchase_order_id' => $purchaseOrder->id,
@@ -75,9 +102,12 @@ class PurchaseOrderController extends Controller
                     $grandTotal += $subtotal;
                 }
 
-                // Update the PO's total amount
                 $purchaseOrder->total_amount = $grandTotal;
                 $purchaseOrder->save();
+
+                if ($markAsOrdered) {
+                    $this->createDraftGoodsReceipt($purchaseOrder);
+                }
 
                 DB::commit();
 
@@ -86,9 +116,8 @@ class PurchaseOrderController extends Controller
                 return back()->withInput()->withErrors('Error saving purchase order: ' . $e->getMessage());
             }
 
-            // Redirect to the PO list for now
-            return redirect()->route('purchase-orders.index')->with('success', 'Purchase Order created successfully.');
-        
+            $message = $markAsOrdered ? 'Purchase Order marked as Ordered and draft receipt created.' : 'Draft Purchase Order created successfully.';
+            return redirect()->route('purchase-orders.show', $purchaseOrder)->with('success', $message);
     }
 
     /**
@@ -125,7 +154,7 @@ class PurchaseOrderController extends Controller
     /**
      * Update the specified resource in storage.
      */
-   public function update(Request $request, PurchaseOrder $purchaseOrder)
+  public function update(Request $request, PurchaseOrder $purchaseOrder)
     {
         if ($purchaseOrder->status !== 'draft') {
             return redirect()->route('purchase-orders.show', $purchaseOrder)
@@ -207,43 +236,15 @@ class PurchaseOrderController extends Controller
                     throw new \Exception("Cannot mark as ordered when items have zero unit cost.");
                  }
                 $purchaseOrder->status = 'ordered';
+                
+                // Use the new helper method
+                $this->createDraftGoodsReceipt($purchaseOrder);
+
             } else {
                 $purchaseOrder->status = 'draft';
             }
 
             $purchaseOrder->save();
-
-            // === THIS IS THE AUTO-DRAFT-CREATION LOGIC ===
-            if ($markAsOrdered) {
-                // Check if a receipt (draft or received) ALREADY exists
-                $existingReceipt = \App\Models\GoodsReceipt::where('purchase_order_id', $purchaseOrder->id)
-                                                         ->exists();
-
-                // Only create the *first* draft if no receipts exist for this PO
-                if (!$existingReceipt) {
-                    $goodsReceipt = \App\Models\GoodsReceipt::create([
-                        'purchase_order_id' => $purchaseOrder->id,
-                        'supplier_id' => $purchaseOrder->supplier_id,
-                        'project_id' => $purchaseOrder->project_id,
-                        'receipt_date' => $purchaseOrder->expected_delivery_date ?? now()->toDateString(),
-                        'status' => 'draft',
-                        'notes' => 'Auto-generated from PO ' . $purchaseOrder->po_number,
-                    ]);
-
-                    // Create the "lines" for the inventory team to fill out
-                    foreach ($purchaseOrder->items as $poItem) {
-                        \App\Models\GoodsReceiptItem::create([
-                            'goods_receipt_id' => $goodsReceipt->id,
-                            'purchase_order_item_id' => $poItem->id,
-                            'inventory_item_id' => $poItem->inventory_item_id,
-                            'quantity_received' => 0, // Team will fill this in
-                            'unit_cost' => $poItem->unit_cost,
-                        ]);
-                    }
-                }
-            }
-            // === END OF AUTO-DRAFT-CREATION ===
-
             DB::commit();
 
         } catch (\Exception $e) {
@@ -256,6 +257,35 @@ class PurchaseOrderController extends Controller
 
         $message = $markAsOrdered ? 'Purchase Order marked as Ordered and draft receipt created.' : 'Draft Purchase Order updated successfully.';
         return redirect()->route('purchase-orders.show', $purchaseOrder)->with('success', $message);
+    }
+
+    private function createDraftGoodsReceipt(PurchaseOrder $purchaseOrder)
+    {
+        $existingReceipt = GoodsReceipt::where('purchase_order_id', $purchaseOrder->id)
+                                       ->where('status', 'draft')
+                                       ->exists();
+
+        // Only create a new draft if one doesn't already exist
+        if (!$existingReceipt) {
+            $goodsReceipt = GoodsReceipt::create([
+                'purchase_order_id' => $purchaseOrder->id,
+                'supplier_id' => $purchaseOrder->supplier_id,
+                'project_id' => $purchaseOrder->project_id, // This will be null if the PO's project_id is null
+                'receipt_date' => $purchaseOrder->expected_delivery_date ?? now()->toDateString(),
+                'status' => 'draft',
+                'notes' => 'Auto-generated from PO ' . $purchaseOrder->po_number,
+            ]);
+
+            foreach ($purchaseOrder->items as $poItem) {
+                GoodsReceiptItem::create([
+                    'goods_receipt_id' => $goodsReceipt->id,
+                    'purchase_order_item_id' => $poItem->id,
+                    'inventory_item_id' => $poItem->inventory_item_id,
+                    'quantity_received' => 0, // A draft receipt starts with 0
+                    'unit_cost' => $poItem->unit_cost,
+                ]);
+            }
+        }
     }
 
     /**

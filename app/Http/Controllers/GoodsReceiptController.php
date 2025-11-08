@@ -50,14 +50,28 @@ class GoodsReceiptController extends Controller
     {
         $validated = $request->validate([
             'receipt_date' => 'required|date',
-            'supplier_id' => 'nullable|exists:suppliers,id',
+            'supplier_id' => 'required|exists:suppliers,id',
             'project_id' => 'nullable|exists:projects,id',
             'notes' => 'nullable|string',
+            'items_json' => 'required|json', // Use items_json
+        ]);
+
+        $itemsArray = json_decode($validated['items_json'], true);
+
+        // Validate the items from the JSON
+        $itemsValidator = \Illuminate\Support\Facades\Validator::make(['items' => $itemsArray], [
             'items' => 'required|array|min:1',
             'items.*.inventory_item_id' => 'required|exists:inventory_items,id',
             'items.*.quantity_received' => 'required|numeric|min:0.01',
             'items.*.unit_cost' => 'required|numeric|min:0',
         ]);
+
+        if ($itemsValidator->fails()) {
+            return back()
+                   ->withInput($request->except('items_json') + ['items_json' => $validated['items_json']])
+                   ->withErrors($itemsValidator);
+        }
+        $validatedItems = $itemsValidator->validated()['items'];
 
         try {
             DB::beginTransaction();
@@ -68,25 +82,24 @@ class GoodsReceiptController extends Controller
                 'project_id' => $validated['project_id'],
                 'notes' => $validated['notes'],
                 'received_by_user_id' => Auth::id(),
-                'status' => 'received', // Non-PO receipts are posted immediately
+                'status' => 'received',
             ]);
 
-            foreach ($validated['items'] as $itemData) {
-                // 1. Create the Goods Receipt Item
+            foreach ($validatedItems as $itemData) { // Use $validatedItems
+
                 $grnItem = $goodsReceipt->items()->create([
                     'inventory_item_id' => $itemData['inventory_item_id'],
                     'quantity_received' => $itemData['quantity_received'],
                     'unit_cost' => $itemData['unit_cost'],
                 ]);
 
-                // 2. Create the StockTransaction
                 StockTransaction::create([
                     'inventory_item_id' => $grnItem->inventory_item_id,
                     'quantity' => $grnItem->quantity_received,
                     'unit_cost' => $grnItem->unit_cost,
                     'sourceable_id' => $goodsReceipt->id,
                     'sourceable_type' => GoodsReceipt::class,
-                    'project_id' => $goodsReceipt->project_id,
+                    'project_id' => $goodsReceipt->project_id, // This will be null if no project is selected
                 ]);
             }
 
@@ -109,8 +122,8 @@ class GoodsReceiptController extends Controller
              return redirect()->route('goods-receipts.edit', $goodsReceipt)
                               ->with('info', 'This is a draft receipt. Please fill in the received quantities and post it.');
         }
-        
-        $goodsReceipt->load('items.inventoryItem', 'supplier', 'project', 'purchaseOrder', 'receiver');
+
+        $goodsReceipt->load('items.inventoryItem', 'supplier', 'project', 'purchaseOrder', 'receiver', 'backOrderReceipt');
         return view('goods-receipts.show', compact('goodsReceipt'));
     }
 
@@ -180,7 +193,7 @@ class GoodsReceiptController extends Controller
     /**
      * This is the new, smart update logic for posting a draft receipt.
      */
-    public function postReceipt(Request $request, GoodsReceipt $goodsReceipt)
+   public function postReceipt(Request $request, GoodsReceipt $goodsReceipt)
     {
         if ($goodsReceipt->status !== 'draft') {
             return redirect()->route('goods-receipts.show', $goodsReceipt)
@@ -190,7 +203,6 @@ class GoodsReceiptController extends Controller
         $validated = $request->validate([
             'receipt_date' => 'required|date',
             'notes' => 'nullable|string',
-            // 'create_back_order' validation is REMOVED
             'items' => [
                 'required', 'array', 'min:1',
                 function ($attribute, $value, $fail) {
@@ -212,15 +224,16 @@ class GoodsReceiptController extends Controller
                     }
                 },
             ],
+            'back_order_action' => 'required|string|in:create,close', 
         ]);
 
         $po = $goodsReceipt->purchaseOrder;
-        $newBackOrderItems = []; // To store items for the new draft
+        $newBackOrderItems = []; 
+        $createBackOrder = $validated['back_order_action'] === 'create';
 
         try {
             DB::beginTransaction();
 
-            // 1. Update the current receipt and mark as 'received'
             $goodsReceipt->update([
                 'receipt_date' => $validated['receipt_date'],
                 'notes' => $validated['notes'],
@@ -228,16 +241,13 @@ class GoodsReceiptController extends Controller
                 'status' => 'received',
             ]);
 
-            // 2. Process all item updates
             foreach ($validated['items'] as $itemData) {
                 $quantityReceivedNow = (float)$itemData['quantity_to_receive'];
                 $grnItem = GoodsReceiptItem::find($itemData['goods_receipt_item_id']);
-                
-                // Update this receipt item with the actual received quantity
+
                 $grnItem->update(['quantity_received' => $quantityReceivedNow]);
 
                 if ($quantityReceivedNow > 0) {
-                    // Create StockTransaction
                     StockTransaction::create([
                         'inventory_item_id' => $grnItem->inventory_item_id,
                         'quantity' => $quantityReceivedNow,
@@ -247,12 +257,10 @@ class GoodsReceiptController extends Controller
                         'project_id' => $goodsReceipt->project_id,
                     ]);
 
-                    // Update PO Item (increment)
                     $poItem = PurchaseOrderItem::find($grnItem->purchase_order_item_id);
                     if ($poItem) {
                         $poItem->increment('quantity_received', $quantityReceivedNow);
 
-                        // Update MR Item (increment)
                         if ($poItem->material_request_item_id) {
                             $mrItem = MaterialRequestItem::find($poItem->material_request_item_id);
                             if ($mrItem) {
@@ -261,23 +269,20 @@ class GoodsReceiptController extends Controller
                         }
                     }
                 }
-                
-                // 4. Check if a back-order is needed
+
                 $remainingForBackOrder = (float)$itemData['max_receivable'] - $quantityReceivedNow;
-                
-                // We AUTOMATICALLY create a back-order if there is a remainder
+
                 if ($remainingForBackOrder > 0.001) {
                     $newBackOrderItems[] = [
                         'purchase_order_item_id' => $grnItem->purchase_order_item_id,
                         'inventory_item_id' => $grnItem->inventory_item_id,
-                        'quantity_received' => 0, // This is a new draft
+                        'quantity_received' => 0,
                         'unit_cost' => $grnItem->unit_cost,
                     ];
                 }
             }
 
-            // 5. Create the new back-order draft (if needed)
-            if (!empty($newBackOrderItems)) {
+            if (!empty($newBackOrderItems) && $createBackOrder) {
                 $newDraftReceipt = GoodsReceipt::create([
                     'purchase_order_id' => $po->id,
                     'supplier_id' => $po->supplier_id,
@@ -287,31 +292,27 @@ class GoodsReceiptController extends Controller
                     'notes' => 'Back-order from ' . $goodsReceipt->receipt_no,
                 ]);
                 $newDraftReceipt->items()->createMany($newBackOrderItems);
+
+                // **NEW:** Link the original receipt to the new back-order
+                $goodsReceipt->back_order_receipt_id = $newDraftReceipt->id;
+                $goodsReceipt->save(); // Save the original receipt
             }
 
-            // --- 6. *** THE BUG FIX *** ---
-            // Refresh PO and its items to get the new totals
-            $po->refresh(); 
+            $po->refresh();
             $po->load('items');
-
-            $allPoItemsReceived = $po->items->every(fn($item) => $item->quantity_received >= $item->quantity_ordered - 0.001);
-
-            // If a new draft was created, status is 'partially_received'
-            // If no new draft was created (meaning all items were received OR
-            // the remaining items were 0), mark as 'received'
-            if (!empty($newBackOrderItems)) {
+            
+            if (!empty($newBackOrderItems) && $createBackOrder) {
                 $po->status = 'partially_received';
             } else {
                 $po->status = 'received';
             }
             $po->save();
 
-            // Refresh Material Request (if it exists)
             if ($po->materialRequest) {
                 $mr = $po->materialRequest;
                 $mr->refresh();
                 $mr->load('items');
-                
+
                 foreach($mr->items as $mrItem) {
                     if ($mrItem->quantity_fulfilled > $mrItem->quantity_requested) {
                         $mrItem->quantity_fulfilled = $mrItem->quantity_requested;
@@ -320,7 +321,7 @@ class GoodsReceiptController extends Controller
                 }
 
                 $allMrItemsFulfilled = $mr->items->every(fn($item) => $item->quantity_fulfilled >= $item->quantity_requested - 0.001);
-                
+
                 if ($allMrItemsFulfilled) {
                     $mr->status = 'fulfilled';
                 } else if ($mr->items->some(fn($item) => $item->quantity_fulfilled > 0)) {
@@ -332,7 +333,7 @@ class GoodsReceiptController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withInput()->withErrors('Error posting receipt: Read  ' . $e->getMessage());
+            return back()->withInput()->withErrors('Error posting receipt: ' . $e->getMessage());
         }
 
         return redirect()->route('goods-receipts.show', $goodsReceipt)

@@ -5,113 +5,165 @@
                 &larr; Receipts
             </a>
             <span class="text-gray-500">/</span>
-            <span>Receive Items for PO {{ $goodsReceipt->purchaseOrder->po_number }}</span>
+            {{-- This is the corrected title --}}
+            <span>Create Non-PO Receipt</span>
         </h2>
     </x-slot>
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <form method="POST" action="{{ route('goods-receipts.post', $goodsReceipt) }}">
-                    @csrf
-                    <div class="p-6">
-                        @if ($errors->any())
-                            <div class="mb-4 p-4 bg-red-100 border border-red-300 text-red-800 rounded-md">
-                                <strong class="font-bold">Whoops! Something went wrong.</strong>
-                                <ul class="mt-2 list-disc list-inside text-sm">
-                                    @foreach ($errors->all() as $error)
-                                        <li>{{ $error }}</li>
-                                    @endforeach
-                                </ul>
-                            </div>
-                        @endif
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <x-input-label for="receipt_date" :value="__('Receipt Date')" />
-                                <x-text-input id="receipt_date" class="block mt-1 w-full" type="date" name="receipt_date" :value="old('receipt_date', $goodsReceipt->receipt_date->format('Y-m-d'))" required />
-                            </div>
-                            <div>
-                                <x-input-label :value="__('PO Reference')" />
-                                <p class="mt-2 text-gray-700 font-semibold">{{ $goodsReceipt->purchaseOrder->po_number }}</p>
-                            </div>
-                            <div>
-                                <x-input-label :value="__('Supplier')" />
-                                <p class="mt-2 text-gray-700">{{ $goodsReceipt->supplier->name }}</p>
-                            </div>
-                            <div class="md:col-span-3">
-                                <x-input-label for="notes" :value="__('Notes')" />
-                                <textarea id="notes" name="notes" rows="2" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm">{{ old('notes', $goodsReceipt->notes) }}</textarea>
-                            </div>
-                        </div>
-                    </div>
+                <div class="p-6 text-gray-900">
 
-                    <div class="p-6 border-t">
-                        <h3 class="text-lg font-semibold mb-2">Items to Receive</h3>
-                        <div class="overflow-x-auto border rounded">
-                            <table class="min-w-full divide-y divide-gray-200 text-sm">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ordered</th>
-                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Already Received</th>
-                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Receiving Now</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    @foreach($itemsFromPO as $index => $item)
-                                    <tr>
-                                        <td class="px-4 py-2 whitespace-nowrap">{{ $item['item_code'] }}</td>
-                                        <td class="px-4 py-2 whitespace-nowrap">{{ $item['item_name'] }} ({{ $item['uom'] }})</td>
-                                        <td class="px-4 py-2 whitespace-nowrap text-right">{{ number_format($item['quantity_ordered'], 2) }}</td>
-                                        <td class="px-4 py-2 whitespace-nowrap text-right">{{ number_format($item['quantity_already_received_on_po'], 2) }}</td>
-                                        <td class="px-4 py-2 whitespace-nowrap text-right">
-                                            <input type="hidden" name="items[{{ $index }}][goods_receipt_item_id]" value="{{ $item['goods_receipt_item_id'] }}">
-                                            <input type="hidden" name="items[{{ $index }}][max_receivable]" value="{{ $item['max_receivable'] }}">
-                                            <input type="number" step="0.01" min="0" max="{{ $item['max_receivable'] }}"
-                                                   name="items[{{ $index }}][quantity_to_receive]"
-                                                   class="w-32 text-right border-gray-300 rounded-md shadow-sm"
-                                                   value="{{ old('items.'.$index.'.quantity_to_receive', $item['quantity_to_receive']) }}">
-                                            <span class="text-xs text-gray-500 ml-1">Max: {{ number_format($item['max_receivable'], 2) }}</span>
-                                        </td>
-                                    </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <div class="p-6 border-t">
-                        <h3 class="text-lg font-semibold mb-2">After Receiving</h3>
-                        <p class="text-sm text-gray-600 mb-2">If any items are not fully received, what should happen?</p>
-                        <div class="space-y-2">
-                            <label class="flex items-center p-3 border rounded-md hover:bg-gray-50">
-                                <input type="radio" name="create_back_order" value="yes" class="mr-3 text-indigo-600" {{ old('create_back_order', 'yes') == 'yes' ? 'checked' : '' }}>
+                    <div x-data="grnForm()">
+                        <form method="POST" action="{{ route('goods-receipts.store') }}">
+                            @csrf
+                            <input type="hidden" name="items_json" :value="JSON.stringify(items.map(item => ({ inventory_item_id: item.inventory_item_id, quantity_received: item.quantity_received, unit_cost: item.unit_cost })))">
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
-                                    <span class="font-medium text-gray-800">Create a new draft receipt (back-order) for remaining items.</span>
-                                    <p class="text-xs text-gray-500">The PO will remain "Partially Received".</p>
+                                    <x-input-label for="receipt_date" :value="__('Receipt Date')" />
+                                    <x-text-input id="receipt_date" class="block mt-1 w-full" type="date" name="receipt_date" :value="old('receipt_date', date('Y-m-d'))" required />
                                 </div>
-                            </label>
-                            <label class="flex items-center p-3 border rounded-md hover:bg-gray-50">
-                                <input type="radio" name="create_back_order" value="no" class="mr-3 text-indigo-600" {{ old('create_back_order') == 'no' ? 'checked' : '' }}>
                                 <div>
-                                    <span class="font-medium text-gray-800">Do NOT create a back-order. Close the PO.</span>
-                                    <p class="text-xs text-gray-500">The PO will be marked as "Received" even if quantities are short.</p>
+                                    <x-input-label for="supplier_id" :value="__('Supplier')" />
+                                    <select id="supplier_id" name="supplier_id" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" x-init="initializeTomSelect($el)">
+                                        <option value="">Select a supplier</option>
+                                        @foreach ($suppliers as $supplier)
+                                            <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
+                                        @endforeach
+                                    </select>
                                 </div>
-                            </label>
-                        </div>
-                        <x-input-error :messages="$errors->get('create_back_order')" class="mt-2" />
+                                <div>
+                                    <x-input-label for="project_id" :value="__('Project (Optional)')" />
+                                    <select id="project_id" name="project_id" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" x-init="initializeTomSelect($el)">
+                                        <option value="">Select a project (for General Stock)</option>
+                                        @foreach ($projects as $project)
+                                            <option value="{{ $project->id }}">{{ $project->project_code }} - {{ $project->quotation->project_name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="md:col-span-3">
+                                    <x-input-label for="notes" :value="__('Notes (Optional)')" />
+                                    <textarea id="notes" name="notes" rows="2" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm">{{ old('notes') }}</textarea>
+                                </div>
+                            </div>
+
+                            <hr class="my-6">
+
+                            <h3 class="text-lg font-semibold mb-2">Items Received</h3>
+                            <div class="space-y-4">
+                                <template x-for="(item, index) in items" :key="item.tempId">
+                                    <div class="flex items-center space-x-2 p-2 bg-gray-50 rounded border">
+                                        <div class="flex-1">
+                                            <label :for="`item_id_${item.tempId}`" class="block font-medium text-sm text-gray-700">{{ __('Item') }}</label>
+                                            <select :id="`item_id_${item.tempId}`" :name="`items[${index}][inventory_item_id]`" class="grn-item-select block mt-1 w-full border-gray-300 text-sm rounded-md shadow-sm" required x-init="initializeTomSelect($el, true, index)">
+                                                <option value="">Select an item</option>
+                                                @foreach ($inventoryItems as $invItem)
+                                                    <option value="{{ $invItem->id }}" data-cost="{{ $invItem->base_purchase_price }}">{{ $invItem->item_code }} - {{ $invItem->item_name }} ({{ $invItem->uom }})</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="w-24">
+                                            <label :for="`item_qty_${item.tempId}`" class="block font-medium text-sm text-gray-700">{{ __('Qty Received') }}</label>
+                                            <input x-model.number="item.quantity_received" :id="`item_qty_${item.tempId}`" class="block mt-1 w-full border-gray-300 text-sm rounded-md shadow-sm text-right" type="number" :name="`items[${index}][quantity_received]`" min="0.01" step="0.01" required />
+                                        </div>
+                                        <div class="w-32">
+                                            <label :for="`item_cost_${item.tempId}`" class="block font-medium text-sm text-gray-700">{{ __('Unit Cost (Rp)') }}</label>
+                                            <input x-model.number="item.unit_cost" :id="`item_cost_${item.tempId}`" class="block mt-1 w-full border-gray-300 text-sm rounded-md shadow-sm text-right" type="number" :name="`items[${index}][unit_cost]`" min="0" step="0.01" required />
+                                        </div>
+                                        <div class="w-32">
+                                            <label class="block font-medium text-sm text-gray-700">{{ __('Subtotal') }}</label>
+                                            <span class="block mt-1 w-full pt-2 text-sm text-right font-semibold" x-text="formatCurrency(item.quantity_received * item.unit_cost)"></span>
+                                        </div>
+                                        <div class="pt-5">
+                                            <button type="button" @click="removeItem(index)" class="text-red-500 hover:text-red-700 font-bold p-2"> X </button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <button type="button" @click="addItem()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Add Line Item</button>
+
+                            <hr class="my-6">
+
+                            <div class="flex justify-end">
+                                <div class="w-64">
+                                    <div class="flex justify-between">
+                                        <span class="font-bold text-lg">Total Amount:</span>
+                                        <span class="font-bold text-lg" x-text="formatCurrency(total)"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-end mt-6 border-t pt-4 space-x-3">
+                                <a href="{{ route('goods-receipts.index') }}" class="text-sm text-gray-600 hover:text-gray-900 rounded-md"> {{ __('Cancel') }} </a>
+                                <x-primary-button> {{ __('Post Receipt') }} </x-primary-button>
+                            </div>
+                        </form>
                     </div>
-                    <div class="flex items-center justify-end p-6 bg-gray-50 border-t">
-                        <a href="{{ route('goods-receipts.index') }}" class="text-sm text-gray-600 hover:text-gray-900 rounded-md">
-                            {{ __('Cancel') }}
-                        </a>
-                        <x-primary-button class="ml-4">
-                            {{ __('Post Received Items') }}
-                        </x-primary-button>
-                    </div>
-                </form>
+                </div>
             </div>
         </div>
     </div>
+    
+    <script>
+        function grnForm() {
+            return {
+                items: [{ tempId: Date.now(), inventory_item_id: '', quantity_received: 1, unit_cost: 0 }],
+                tomSelectInstances: {},
+                
+                newItem() {
+                     return { tempId: Date.now() + '-' + Math.random().toString(36).substr(2, 5), inventory_item_id: '', quantity_received: 1, unit_cost: 0 };
+                },
+                addItem() {
+                    this.items.push(this.newItem());
+                },
+                removeItem(index) {
+                    let item = this.items[index];
+                    if (item) {
+                        this.destroySelect(`item_id_${item.tempId}`);
+                    }
+                    if (index >= 0 && index < this.items.length) {
+                         this.items.splice(index, 1);
+                    }
+                },
+                get total() {
+                    return this.items.reduce((sum, item) => {
+                        return sum + ((parseFloat(item.quantity_received) || 0) * (parseFloat(item.unit_cost) || 0));
+                    }, 0);
+                },
+                initializeTomSelect(element, isItemSelect = false, itemIndex = null) {
+                     if (element && !element.tomselect) {
+                        let self = this;
+                        let instance = new TomSelect(element, {
+                            create: false,
+                            sortField: { field: "text", direction: "asc" },
+                            onChange: function(value) {
+                                if (isItemSelect && itemIndex !== null && self.items[itemIndex]) {
+                                    self.items[itemIndex].inventory_item_id = value;
+                                    // Auto-fill unit cost from data attribute
+                                    const selectedOption = this.getOption(value);
+                                    if(selectedOption) {
+                                        self.items[itemIndex].unit_cost = parseFloat(selectedOption.dataset.cost) || 0;
+                                    }
+                                }
+                            }
+                        });
+                        this.tomSelectInstances[element.id] = instance;
+                     }
+                },
+                destroySelect(elementId) {
+                     if (elementId && this.tomSelectInstances[elementId]) {
+                         this.tomSelectInstances[elementId].destroy();
+                         delete this.tomSelectInstances[elementId];
+                     }
+                },
+                formatCurrency(value) {
+                     if (isNaN(value)) return 'Rp 0';
+                    return parseFloat(value).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                }
+            }
+        }
+    </script>
 </x-app-layout>

@@ -62,4 +62,9 @@ class GoodsReceipt extends Model
             $receipt->receipt_no = $prefix . str_pad($number, 4, '0', STR_PAD_LEFT);
         });
     }
+
+    public function backOrderReceipt()
+    {
+        return $this->belongsTo(GoodsReceipt::class, 'back_order_receipt_id');
+    }
 }
