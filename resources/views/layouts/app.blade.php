@@ -192,6 +192,13 @@
                                 <span>Inventory</span>
                             </h3>
                             <div class="mt-2 space-y-1.5">
+                                @can('manage inventory')
+                                <a href="{{ route('goods-receipts.index') }}"
+                                class="{{ $baseClasses }} {{ request()->routeIs('goods-receipts.*') ? $activeClasses : $inactiveClasses }}"
+                                x-show="!lowerSearch || '{{ strtolower(__('Receiving')) }}'.includes(lowerSearch)">
+                                    {{ __('Receiving') }}
+                                </a>
+                                @endcan
                                 <a href="{{ route('inventory-items.index') }}" 
                                    class="{{ $baseClasses }} {{ request()->routeIs('inventory-items.*') ? $activeClasses : $inactiveClasses }}"
                                    x-show="!lowerSearch || '{{ strtolower(__('Item Master')) }}'.includes(lowerSearch)">

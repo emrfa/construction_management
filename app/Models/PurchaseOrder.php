@@ -59,4 +59,17 @@ class PurchaseOrder extends Model
             $po->po_number = "PO-{$year}-" . str_pad($number, 4, '0', STR_PAD_LEFT);
         });
     }
+
+    public function goodsReceipts()
+    {
+        return $this->hasMany(\App\Models\GoodsReceipt::class);
+    }
+
+    /**
+     * Get the material request that this purchase order was created for.
+     */
+    public function materialRequest()
+    {
+        return $this->belongsTo(MaterialRequest::class);
+    }
 }

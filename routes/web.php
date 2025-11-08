@@ -79,16 +79,22 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('inventory-items', InventoryItemController::class);
 
+    // Receipt
+    Route::resource('goods-receipts', \App\Http\Controllers\GoodsReceiptController::class)->except(['destroy']);
+    // This is the route for your "Create Back-Order / Close Short" logic
+    Route::post('/goods-receipts/{goodsReceipt}/post', [\App\Http\Controllers\GoodsReceiptController::class, 'postReceipt'])
+        ->name('goods-receipts.post');
+
+    // This is the route for the "Force Close" button on the PO
+    Route::post('/purchase-orders/{purchaseOrder}/force-close', [\App\Http\Controllers\PurchaseOrderController::class, 'forceClose'])
+        ->name('purchase-orders.force-close');
+
     // Supplier Management
     Route::resource('suppliers', SupplierController::class);
 
     // PO Management
     Route::resource('purchase-orders', PurchaseOrderController::class);
     Route::post('/purchase-orders/{purchaseOrder}/status', [PurchaseOrderController::class, 'updateStatus'])->name('purchase-orders.updateStatus');
-
-    Route::get('/purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'showReceiveForm'])->name('purchase-orders.receiveForm');
-    Route::post('/purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'processReceive'])->name('purchase-orders.receive');
-
     // Billings
     Route::resource('billings', BillingController::class);
     Route::post('/billings/{billing}/status', [BillingController::class, 'updateStatus'])

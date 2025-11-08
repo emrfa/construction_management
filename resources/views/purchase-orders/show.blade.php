@@ -11,7 +11,6 @@
             <div class="flex items-center space-x-2">
                 @if ($purchaseOrder->status == 'draft')
                     <a href="{{ route('purchase-orders.edit', $purchaseOrder) }}" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded text-sm">Edit</a>
-
                     <form method="POST" action="{{ route('purchase-orders.updateStatus', $purchaseOrder) }}">
                         @csrf
                         <input type="hidden" name="status" value="ordered">
@@ -19,12 +18,17 @@
                             Mark as Ordered
                         </button>
                     </form>
-                @elseif ($purchaseOrder->status == 'ordered' || $purchaseOrder->status == 'partially_received')
-                    <a href="{{ route('purchase-orders.receiveForm', $purchaseOrder) }}" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm">
-                        Receive Items
-                    </a>
                 @endif
-                </div>
+                
+                @if ($purchaseOrder->status == 'partially_received')
+                    <form method="POST" action="{{ route('purchase-orders.force-close', $purchaseOrder) }}" onsubmit="return confirm('Are you sure you want to force close this PO? No more items can be received.');">
+                        @csrf
+                        <button type="submit" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm">
+                            Force Close PO
+                        </button>
+                    </form>
+                @endif
+            </div>
         </div>
     </x-slot>
 
@@ -73,6 +77,7 @@
                                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">UoM</th>
                                     <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Qty Ordered</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Qty Received</th>
                                     <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Cost (Rp)</th>
                                     <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal (Rp)</th>
                                 </tr>
@@ -83,19 +88,74 @@
                                     <td class="px-4 py-2 whitespace-nowrap">{{ $item->inventoryItem->item_code }}</td>
                                     <td class="px-4 py-2 whitespace-nowrap">{{ $item->inventoryItem->item_name }}</td>
                                     <td class="px-4 py-2 whitespace-nowrap">{{ $item->inventoryItem->uom }}</td>
-                                    <td class="px-4 py-2 whitespace-nowrap text-right">{{ number_format($item->quantity_ordered, 2, ',', '.') }}</td>
-                                    <td class="px-4 py-2 whitespace-nowrap text-right">{{ number_format($item->unit_cost, 0, ',', '.') }}</td>
-                                    <td class="px-4 py-2 whitespace-nowrap text-right font-semibold">{{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-right font-medium">{{ number_format($item->quantity_ordered, 2) }}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-right font-bold {{ $item->quantity_received < $item->quantity_ordered ? 'text-yellow-600' : 'text-green-600' }}">
+                                        {{ number_format($item->quantity_received, 2) }}
+                                    </td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-right">{{ number_format($item->unit_cost, 0) }}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-right font-semibold">{{ number_format($item->subtotal, 0) }}</td>
                                 </tr>
                                 @endforeach
                             </tbody>
                             <tfoot>
                                 <tr>
-                                    <td colspan="5" class="px-4 py-2 text-right font-bold uppercase text-gray-600">Total Amount:</td>
-                                    <td class="px-4 py-2 text-right font-bold text-lg">Rp {{ number_format($purchaseOrder->total_amount, 0, ',', '.') }}</td>
+                                    <td colspan="6" class="px-4 py-2 text-right font-bold uppercase text-gray-600">Total Amount:</td>
+                                    <td class="px-4 py-2 text-right font-bold text-lg">Rp {{ number_format($purchaseOrder->total_amount, 0) }}</td>
                                 </tr>
                             </tfoot>
                         </table>
+                    
+                    <div class="mt-6 pt-4 border-t">
+                        <h3 class="text-lg font-semibold mb-2">Receiving History</h3>
+                        @php $purchaseOrder->loadMissing('goodsReceipts'); @endphp
+                        <div class="overflow-x-auto border rounded">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Receipt #</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    @forelse ($purchaseOrder->goodsReceipts as $receipt)
+                                        <tr>
+                                            <td class="px-4 py-2 whitespace-nowrap">
+                                                <a href="{{ route('goods-receipts.show', $receipt) }}" class="text-indigo-600 hover:text-indigo-900 font-medium">
+                                                    {{ $receipt->receipt_no }}
+                                                </a>
+                                            </td>
+                                            <td class="px-4 py-2 whitespace-nowrap">{{ $receipt->receipt_date->format('d-M-Y') }}</td>
+                                            <td class="px-4 py-2 whitespace-nowrap">
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                                    {{ $receipt->status == 'draft' ? 'bg-yellow-200 text-yellow-800' : 'bg-green-200 text-green-800' }}">
+                                                    {{ ucfirst($receipt->status) }}
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
+                                                @if($receipt->status == 'draft')
+                                                    <a href="{{ route('goods-receipts.edit', $receipt) }}" class="text-green-600 hover:text-green-900 font-bold">
+                                                        Receive
+                                                    </a>
+                                                @else
+                                                    <a href="{{ route('goods-receipts.show', $receipt) }}" class="text-indigo-600 hover:text-indigo-900">
+                                                        View
+                                                    </a>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="4" class="px-4 py-2 text-center text-gray-500">
+                                                No receiving documents have been generated for this PO.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
 
                 </div>
             </div>

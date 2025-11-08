@@ -125,61 +125,51 @@ class PurchaseOrderController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, PurchaseOrder $purchaseOrder)
+   public function update(Request $request, PurchaseOrder $purchaseOrder)
     {
-        // Only allow updating if PO is still a draft
         if ($purchaseOrder->status !== 'draft') {
             return redirect()->route('purchase-orders.show', $purchaseOrder)
                              ->with('error', 'Only draft Purchase Orders can be updated.');
         }
 
-        // Validate header data (including supplier) and items
         $validatedData = $request->validate([
             'supplier_id' => 'required|exists:suppliers,id',
             'order_date' => 'required|date',
             'expected_delivery_date' => 'nullable|date|after_or_equal:order_date',
-            // Validate the raw JSON input first
             'items_json' => 'required|json',
         ]);
 
-        // Decode the JSON items
         $itemsArray = json_decode($validatedData['items_json'], true);
 
-        // Deeper validation on decoded items
          $itemsValidator = \Illuminate\Support\Facades\Validator::make(['items' => $itemsArray], [
             'items' => 'required|array|min:1',
-            'items.*.id' => 'nullable|exists:purchase_order_items,id', // Existing item ID
+            'items.*.id' => 'nullable|exists:purchase_order_items,id',
             'items.*.inventory_item_id' => 'required|exists:inventory_items,id',
             'items.*.quantity_ordered' => 'required|numeric|min:0.01',
-            'items.*.unit_cost' => 'required|numeric|min:0', // Cost required in draft edit
+            'items.*.unit_cost' => 'required|numeric|min:0',
         ]);
 
          if ($itemsValidator->fails()) {
-            // Re-encode JSON for old() helper
             return back()
                    ->withInput($request->except('items_json') + ['items_json' => $validatedData['items_json']])
                    ->withErrors($itemsValidator);
         }
-        $validatedItems = $itemsValidator->validated()['items']; // Use validated array
-
+        $validatedItems = $itemsValidator->validated()['items'];
 
         $grandTotal = 0;
-        // Check which button was clicked BEFORE the try block
         $markAsOrdered = $request->has('mark_ordered') && $request->input('mark_ordered') == '1';
 
         try {
             DB::beginTransaction();
 
-            // Update PO Header
             $purchaseOrder->update([
                 'supplier_id' => $validatedData['supplier_id'],
                 'order_date' => $validatedData['order_date'],
                 'expected_delivery_date' => $validatedData['expected_delivery_date'],
             ]);
 
-            $processedItemIds = []; // Keep track of item IDs from the form
+            $processedItemIds = [];
 
-            // Update or Create PO Items
             foreach ($validatedItems as $itemData) {
                 $subtotal = ($itemData['quantity_ordered'] ?? 0) * ($itemData['unit_cost'] ?? 0);
                 $grandTotal += $subtotal;
@@ -189,65 +179,82 @@ class PurchaseOrderController extends Controller
                     'quantity_ordered' => $itemData['quantity_ordered'],
                     'unit_cost' => $itemData['unit_cost'],
                     'subtotal' => $subtotal,
-                     // material_request_item_id is preserved if it existed
                 ];
 
                 if (!empty($itemData['id'])) {
-                    // Update existing item belonging to this PO
                     $item = $purchaseOrder->items()->find($itemData['id']);
                     if ($item) {
                         $item->update($itemPayload);
                         $processedItemIds[] = $item->id;
                     }
-                    // else: log warning or ignore if ID doesn't belong?
                 } else {
-                    // Create new item (ensure material_request_item_id is null if needed)
-                   $itemPayload['material_request_item_id'] = $itemData['material_request_item_id'] ?? null; // Carry over if present in JS, unlikely though
+                   $itemPayload['material_request_item_id'] = $itemData['material_request_item_id'] ?? null;
                    $newItem = $purchaseOrder->items()->create($itemPayload);
                    $processedItemIds[] = $newItem->id;
                 }
             }
 
-            // Delete items associated with this PO that were NOT in the submitted form data
             $purchaseOrder->items()->whereNotIn('id', $processedItemIds)->delete();
-
-            // Update the PO's total amount
             $purchaseOrder->total_amount = $grandTotal;
 
-            // Update status based on button clicked
             if ($markAsOrdered) {
-                // Ensure supplier is set (redundant due to validation, but safe)
                 if(empty($purchaseOrder->supplier_id)) {
                      throw new \Exception("Cannot mark as ordered without selecting a supplier.");
                 }
-                 // Check costs AFTER updates/deletes are processed
-                 // Refresh items relation to get the final list
                  $purchaseOrder->load('items');
                  $itemsWithZeroCost = $purchaseOrder->items->filter(fn($item) => $item->unit_cost <= 0)->count();
-
                  if ($itemsWithZeroCost > 0) {
                     throw new \Exception("Cannot mark as ordered when items have zero unit cost.");
                  }
                 $purchaseOrder->status = 'ordered';
             } else {
-                // Keep as draft if only "Save Draft" was clicked
                 $purchaseOrder->status = 'draft';
             }
 
-            $purchaseOrder->save(); // Save total amount and status changes
+            $purchaseOrder->save();
+
+            // === THIS IS THE AUTO-DRAFT-CREATION LOGIC ===
+            if ($markAsOrdered) {
+                // Check if a receipt (draft or received) ALREADY exists
+                $existingReceipt = \App\Models\GoodsReceipt::where('purchase_order_id', $purchaseOrder->id)
+                                                         ->exists();
+
+                // Only create the *first* draft if no receipts exist for this PO
+                if (!$existingReceipt) {
+                    $goodsReceipt = \App\Models\GoodsReceipt::create([
+                        'purchase_order_id' => $purchaseOrder->id,
+                        'supplier_id' => $purchaseOrder->supplier_id,
+                        'project_id' => $purchaseOrder->project_id,
+                        'receipt_date' => $purchaseOrder->expected_delivery_date ?? now()->toDateString(),
+                        'status' => 'draft',
+                        'notes' => 'Auto-generated from PO ' . $purchaseOrder->po_number,
+                    ]);
+
+                    // Create the "lines" for the inventory team to fill out
+                    foreach ($purchaseOrder->items as $poItem) {
+                        \App\Models\GoodsReceiptItem::create([
+                            'goods_receipt_id' => $goodsReceipt->id,
+                            'purchase_order_item_id' => $poItem->id,
+                            'inventory_item_id' => $poItem->inventory_item_id,
+                            'quantity_received' => 0, // Team will fill this in
+                            'unit_cost' => $poItem->unit_cost,
+                        ]);
+                    }
+                }
+            }
+            // === END OF AUTO-DRAFT-CREATION ===
 
             DB::commit();
 
         } catch (\Exception $e) {
             DB::rollBack();
              \Log::error("Error updating PO [ID: {$purchaseOrder->id}]: " . $e->getMessage());
-             // Re-encode JSON for old() helper
             return back()
                    ->withInput($request->except('items_json') + ['items_json' => $validatedData['items_json']])
                    ->withErrors('Error updating purchase order: ' . $e->getMessage());
         }
 
-        $message = $markAsOrdered ? 'Purchase Order marked as Ordered successfully.' : 'Draft Purchase Order updated successfully.';
+        $message = $markAsOrdered ? 'Purchase Order marked as Ordered and draft receipt created.' : 'Draft Purchase Order updated successfully.';
         return redirect()->route('purchase-orders.show', $purchaseOrder)->with('success', $message);
     }
 
