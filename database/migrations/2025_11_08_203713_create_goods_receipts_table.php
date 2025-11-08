@@ -19,7 +19,7 @@ return new class extends Migration
     $table->foreignId('project_id')->nullable()->constrained()->nullOnDelete();
     $table->foreignId('received_by_user_id')->nullable()->constrained('users')->nullOnDelete();
     $table->date('receipt_date');
-    $table->enum('status', ['draft', 'posted'])->default('posted');
+    $table->enum('status', ['draft', 'received', 'partially_received'])->default('draft');
     $table->text('notes')->nullable();
     $table->timestamps();
         });
