@@ -50,4 +50,9 @@ class ProgressUpdate extends Model
         return $this->hasMany(EquipmentUsage::class);
     }
 
+    public function stockTransactions()
+    {
+        return $this->morphMany(StockTransaction::class, 'sourceable');
+    }
+
 }

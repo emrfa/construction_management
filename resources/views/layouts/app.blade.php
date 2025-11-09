@@ -240,12 +240,21 @@
                                    x-show="!lowerSearch || '{{ strtolower(__('Stock Locations')) }}'.includes(lowerSearch)">
                                     {{ __('Stock Locations') }}
                                 </a>
+                                <a href="{{ route('stock-adjustments.index') }}"
+                                   class="{{ $baseClasses }} {{ request()->routeIs('stock-adjustments.*') ? $activeClasses : $inactiveClasses }}"
+                                   x-show="!lowerSearch || '{{ strtolower(__('Stock Adjustments')) }}'.includes(lowerSearch)">
+                                    {{ __('Stock Adjustments') }}
+                                </a>
                                 <a href="{{ route('stock-overview.index') }}"
                                    class="{{ $baseClasses }} {{ request()->routeIs('stock-overview.*') ? $activeClasses : $inactiveClasses }}"
                                    x-show="!lowerSearch || '{{ strtolower(__('Stock Overview')) }}'.includes(lowerSearch)">
                                     {{ __('Stock Overview') }}
                                 </a>
-                                <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}" x-show="!lowerSearch || 'material usage'.includes(lowerSearch)">Material Usage</a>
+                                <a href="{{ route('material-usage.index') }}"
+                                   class="{{ $baseClasses }} {{ request()->routeIs('material-usage.index') ? $activeClasses : $inactiveClasses }}"
+                                   x-show="!lowerSearch || 'material usage'.includes(lowerSearch)">
+                                    Material Usage
+                                </a>
                             </div>
                         </div>
                         @endif

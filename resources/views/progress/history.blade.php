@@ -16,7 +16,7 @@
 
                     <h3 class="text-lg font-semibold">{{ $quotation_item->description }}</h3>
                     <p class="text-sm text-gray-600 mb-4">
-                        Current Progress: 
+                        Current Progress:
                         <span class="font-bold text-blue-600">{{ $quotation_item->latest_progress }}%</span>
                     </p>
 
@@ -36,31 +36,49 @@
                                     <td class="px-6 py-4 whitespace-nowrap">{{ $update->user->name }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">{{ $update->percent_complete }}%</td>
                                     <td class="px-6 py-4 whitespace-nowrap">{{ $update->notes }}</td>
-                                   @if ($update->materialUsages?->count())
-        <tr class="bg-gray-50">
-            <td colspan="4" class="px-8 py-2 text-sm text-gray-700">
-                <strong>Materials Used:</strong>
-                <ul class="list-disc ml-5 mt-1">
-                    @foreach ($update->materialUsages as $usage)
-                        <li>
-                            {{ $usage->inventoryItem->item_name }} — 
-                            Qty Used: {{ $usage->quantity_used }}
-                            @if ($usage->inventoryItem->stockTransactions()->where('project_id', $project->id)->exists())
-                                (Remaining Stock: 
-                                {{ $usage->inventoryItem->stockTransactions()->where('project_id', $project->id)->sum('quantity') }})
-                            @endif
-                        </li>
-                    @endforeach
-                </ul>
-            </td>
-        </tr>
-    @endif
-@empty
-    <tr>
-        <td colspan="4" class="px-6 py-4 whitespace-nowrap text-center text-gray-500">
-            No progress updates found for this task.
-        </td>
-    </tr>
+                                </tr> {{-- <-- 1. This </tr> tag was missing in your file --}}
+                                
+                                @if ($update->materialUsages?->count())
+                                <tr class="bg-gray-50">
+                                    <td colspan="4" class="px-8 py-2 text-sm text-gray-700">
+                                        <strong>Materials Used:</strong>
+                                        <ul class="list-disc ml-5 mt-1">
+                                            @foreach ($update->materialUsages as $usage)
+                                                <li>
+                                                    {{ $usage->inventoryItem->item_name }} —
+                                                    Qty Used: {{ $usage->quantity_used }}
+                                                    
+                                                    {{-- 2. START OF THE FIX --}}
+                                                    @php
+                                                        // Get the project's location ID from the $project variable
+                                                        $projectLocationId = $project->stockLocation?->id;
+                                                        
+                                                        // Get the current balance for this item *at this location*
+                                                        $currentStock = 0;
+                                                        if ($projectLocationId) {
+                                                            $currentStock = $usage->inventoryItem
+                                                                                  ->stockTransactions()
+                                                                                  ->where('stock_location_id', $projectLocationId)
+                                                                                  ->sum('quantity');
+                                                        }
+                                                    @endphp
+                                                    
+                                                    @if($projectLocationId)
+                                                    (Remaining Stock at Location: {{ number_format($currentStock, 2) }})
+                                                    @endif
+                                                    {{-- END OF THE FIX --}}
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </td>
+                                </tr>
+                                @endif
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="px-6 py-4 whitespace-nowrap text-center text-gray-500">
+                                        No progress updates found for this task.
+                                    </td>
+                                </tr>
                             @endforelse
                         </tbody>
                     </table>

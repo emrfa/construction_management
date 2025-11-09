@@ -23,8 +23,14 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\UserRoleController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\MaterialUsageController;
+
+use App\Models\StockTransaction;
+use App\Models\StockLocation;
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -118,9 +124,58 @@ Route::middleware('auth')->group(function () {
     // Stock Location
     Route::resource('stock-locations', \App\Http\Controllers\StockLocationController::class);
 
+    // Stock Adjustment
+    Route::resource('stock-adjustments', \App\Http\Controllers\StockAdjustmentController::class)
+         ->only(['index', 'create', 'store', 'show']);
+
+    // API Route to get stock balances for a location
+    Route::get('/web-api/locations/{stockLocation}/stock', function (StockLocation $stockLocation, Request $request) {
+        
+        // 1. Get ALL balances for the selected location and key them by item_id
+        $stockBalances = StockTransaction::where('stock_location_id', $stockLocation->id)
+            ->select('inventory_item_id', DB::raw('SUM(quantity) as on_hand'))
+            ->groupBy('inventory_item_id')
+            ->get()
+            ->keyBy('inventory_item_id');
+
+        // 2. Start a query for all Inventory Items
+        $query = \App\Models\InventoryItem::query();
+
+        // 3. Apply the user's filter
+        if (!$request->boolean('include_zero')) {
+            // IF 'include_zero' is FALSE:
+            // Only get items that actually have a positive balance at this location.
+            $itemIdsWithStock = $stockBalances->filter(fn($balance) => $balance->on_hand > 0.001)
+                                            ->pluck('inventory_item_id');
+            $query->whereIn('id', $itemIdsWithStock);
+        }
+        // IF 'include_zero' is TRUE:
+        // The query remains `InventoryItem::query()`, so it will fetch ALL master items.
+
+        $items = $query->orderBy('item_code')->get();
+
+        // 4. Combine the data into a clean array
+        $reportData = $items->map(function ($item) use ($stockBalances) {
+            $balance = $stockBalances->get($item->id); // Find the balance (if it exists)
+            return [
+                'inventory_item_id' => $item->id,
+                'item_code' => $item->item_code,
+                'item_name' => $item->item_name,
+                'uom' => $item->uom,
+                'on_hand' => $balance ? (float)$balance->on_hand : 0, // Get the balance or default to 0
+            ];
+        });
+
+        return response()->json($reportData);
+        
+    })->name('api.locations.stock');
+
     // Stock Summary
     Route::get('/stock-overview', [\App\Http\Controllers\StockOverviewController::class, 'index'])->name('stock-overview.index');
     Route::get('/stock-overview/{stockLocation}', [\App\Http\Controllers\StockOverviewController::class, 'show'])->name('stock-overview.show');
+
+    // Material Usage
+    Route::get('/material-usage', [MaterialUsageController::class, 'index'])->name('material-usage.index');
 
     // Labor
     Route::resource('labor-rates', LaborRateController::class);
