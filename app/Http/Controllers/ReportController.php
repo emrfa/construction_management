@@ -7,6 +7,7 @@ use App\Models\MaterialRequestItem;
 use App\Models\PurchaseOrderItem;
 use App\Models\MaterialUsage;
 use App\Models\InventoryItem;
+use App\Models\StockTransaction;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -399,5 +400,28 @@ class ReportController extends Controller
             // We pass this one extra variable for the *new* task chart JS
             'taskScurveData' => $taskDetails 
         ]);
+    }
+
+    /**
+     * Show a report of all stock, grouped by item and location.
+     */
+    public function stockBalanceReport()
+    {
+        $stockBalances = StockTransaction::with([
+                'item', // Eager-load the item details
+                'stockLocation.project.quotation' // Eager-load the location, and *if* it's a project, its details
+            ])
+            ->select('inventory_item_id', 'stock_location_id', DB::raw('SUM(quantity) as on_hand')) // <-- Use stock_location_id
+            ->groupBy('inventory_item_id', 'stock_location_id') // <-- Use stock_location_id
+            ->having('on_hand', '!=', 0) // Only show items with stock
+            ->get();
+
+        // Sort the results by item code, then by location name
+        $sortedBalances = $stockBalances->sortBy([
+            ['item.item_code', 'asc'],
+            ['stockLocation.name', 'asc']
+        ]);
+
+        return view('reports.stock_balance', ['balances' => $sortedBalances]);
     }
 }

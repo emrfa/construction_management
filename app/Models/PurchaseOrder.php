@@ -72,4 +72,9 @@ class PurchaseOrder extends Model
     {
         return $this->belongsTo(MaterialRequest::class);
     }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
 }

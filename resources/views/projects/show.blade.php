@@ -295,7 +295,7 @@
                     <div x-show="open" x-transition class="overflow-x-auto mt-2 border rounded">
                         @php
                             // Call the new method to get the summary data
-                            $wbsMaterialSummary = $project->getWbsMaterialSummary();
+                            $wbsMaterialSummary = $project->getMaterialStockSummary();
                         @endphp
                         <table class="min-w-full divide-y divide-gray-200 text-sm">
                             <thead class="bg-gray-50">

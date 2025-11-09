@@ -111,6 +111,17 @@ Route::middleware('auth')->group(function () {
     // Stock Ledger
     Route::get('/stock-ledger', [StockLedgerController::class, 'index'])->name('stock-ledger.index');
 
+    // Stock Balance
+    Route::get('/reports/stock-balance', [ReportController::class, 'stockBalanceReport'])
+        ->name('reports.stock_balance');
+
+    // Stock Location
+    Route::resource('stock-locations', \App\Http\Controllers\StockLocationController::class);
+
+    // Stock Summary
+    Route::get('/stock-overview', [\App\Http\Controllers\StockOverviewController::class, 'index'])->name('stock-overview.index');
+    Route::get('/stock-overview/{stockLocation}', [\App\Http\Controllers\StockOverviewController::class, 'show'])->name('stock-overview.show');
+
     // Labor
     Route::resource('labor-rates', LaborRateController::class);
 

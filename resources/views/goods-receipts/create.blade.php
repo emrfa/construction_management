@@ -5,7 +5,6 @@
                 &larr; Receipts
             </a>
             <span class="text-gray-500">/</span>
-            {{-- This is the corrected title --}}
             <span>Create Non-PO Receipt</span>
         </h2>
     </x-slot>
@@ -26,7 +25,7 @@
                                     <x-text-input id="receipt_date" class="block mt-1 w-full" type="date" name="receipt_date" :value="old('receipt_date', date('Y-m-d'))" required />
                                 </div>
                                 <div>
-                                    <x-input-label for="supplier_id" :value="__('Supplier')" />
+                                    <x-input-label for="supplier_id" :value="__('Supplier (Optional)')" />
                                     <select id="supplier_id" name="supplier_id" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" x-init="initializeTomSelect($el)">
                                         <option value="">Select a supplier</option>
                                         @foreach ($suppliers as $supplier)
@@ -34,19 +33,27 @@
                                         @endforeach
                                     </select>
                                 </div>
+                                
+                                {{-- NEW: Stock Location Dropdown --}}
                                 <div>
-                                    <x-input-label for="project_id" :value="__('Project (Optional)')" />
-                                    <select id="project_id" name="project_id" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" x-init="initializeTomSelect($el)">
-                                        <option value="">Select a project (for General Stock)</option>
-                                        @foreach ($projects as $project)
-                                            <option value="{{ $project->id }}">{{ $project->project_code }} - {{ $project->quotation->project_name }}</option>
+                                    <x-input-label for="stock_location_id" :value="__('Receive To Location')" />
+                                    <select id="stock_location_id" name="stock_location_id" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" x-init="initializeTomSelect($el)" required>
+                                        <option value="">Select a location...</option>
+                                        @foreach ($locations as $location)
+                                            <option value="{{ $location->id }}">{{ $location->name }} ({{ $location->code }})</option>
                                         @endforeach
                                     </select>
+                                    <x-input-error :messages="$errors->get('stock_location_id')" class="mt-2" />
                                 </div>
+                                
                                 <div class="md:col-span-3">
                                     <x-input-label for="notes" :value="__('Notes (Optional)')" />
                                     <textarea id="notes" name="notes" rows="2" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm">{{ old('notes') }}</textarea>
                                 </div>
+                                
+                                {{-- Project is optional, can be removed if confusing --}}
+                                <input type="hidden" name="project_id" :value="null">
+
                             </div>
 
                             <hr class="my-6">
@@ -142,7 +149,6 @@
                             onChange: function(value) {
                                 if (isItemSelect && itemIndex !== null && self.items[itemIndex]) {
                                     self.items[itemIndex].inventory_item_id = value;
-                                    // Auto-fill unit cost from data attribute
                                     const selectedOption = this.getOption(value);
                                     if(selectedOption) {
                                         self.items[itemIndex].unit_cost = parseFloat(selectedOption.dataset.cost) || 0;

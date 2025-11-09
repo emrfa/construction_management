@@ -8,29 +8,27 @@
     <div class="py-12">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                
-                {{-- This Alpine.js component will manage all our dynamic rows --}}
+
                 <div x-data="progressForm({
                     materials: {{ json_encode(old('materials', [])) }},
                     labors: {{ json_encode(old('labors', [])) }},
-                    equipments: {{ json_encode(old('equipments', [])) }}
+                    equipments: {{ json_encode(old('equipments', [])) }},
+                    stockLocationExists: {{ $stockLocation ? 'true' : 'false' }}
                 })">
                     <form method="POST" action="{{ route('progress.store', $project) }}">
                         @csrf
-                        
-                        {{-- Hidden inputs to store the JSON data --}}
+
                         <input type="hidden" name="materials_json" x-model="JSON.stringify(materials)">
                         <input type="hidden" name="labors_json" x-model="JSON.stringify(labors)">
                         <input type="hidden" name="equipments_json" x-model="JSON.stringify(equipments)">
 
                         <div class="p-6 text-gray-900 space-y-6">
 
-                            {{-- 1. MAIN DETAILS --}}
                             <h3 class="text-lg font-medium text-gray-900 border-b pb-2">Progress Details</h3>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div>
                                     <x-input-label for="quotation_item_id" :value="__('Project Task (WBS)')" />
-                                    <select id="quotation_item_id" name="quotation_item_id" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" required>
+                                    <select id="quotation_item_id" name="quotation_item_id" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" x-init="initializeTomSelect($el)" required>
                                         <option value="">-- Select a task --</option>
                                         @foreach($tasks as $task)
                                             <option value="{{ $task->id }}" {{ old('quotation_item_id') == $task->id ? 'selected' : '' }}>
@@ -60,23 +58,43 @@
                             {{-- 2. MATERIALS USED --}}
                             <hr />
                             <h3 class="text-lg font-medium text-gray-900">Materials Used</h3>
-                            <div class="space-y-2">
-                                <template x-for="(material, index) in materials" :key="index">
-                                    <div class="flex items-center space-x-2">
-                                        <select x-model="material.id" class="tom-select-mat block w-full border-gray-300 text-sm rounded-md shadow-sm" placeholder="Select material...">
-                                            <option value="">Select material...</option>
-                                            @foreach($inventoryItems as $item)
-                                                <option value="{{ $item->id }}">{{ $item->item_name }} ({{ $item->uom }})</option>
-                                            @endforeach
-                                        </select>
-                                        <x-text-input type="number" step="0.01" x-model.number="material.quantity" class="block w-32 text-sm" placeholder="Qty" />
-                                        <button type="button" @click="removeMaterial(index)" class="text-red-500 hover:text-red-700 p-1">✖</button>
-                                    </div>
-                                </template>
+                            
+                            {{-- UPDATED: Show location, or an error --}}
+                            @if($stockLocation)
+                                <div class="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                    <p class="font-medium text-blue-800">
+                                        Materials will be consumed from: 
+                                        <strong>{{ $stockLocation->name }} ({{ $stockLocation->code }})</strong>
+                                    </p>
+                                </div>
+                            @else
+                                <div class="p-3 bg-red-100 border border-red-300 rounded-md">
+                                    <p class="font-medium text-red-800">
+                                        Error: This project has no stock location assigned. Material usage cannot be recorded.
+                                    </p>
+                                </div>
+                            @endif
+                            
+                            {{-- Hide material section if no location exists --}}
+                            <div x-show="stockLocationExists">
+                                <div class="space-y-2">
+                                    <template x-for="(material, index) in materials" :key="index">
+                                        <div class="flex items-center space-x-2">
+                                            <select x-model="material.id" class="tom-select-mat block w-full border-gray-300 text-sm rounded-md shadow-sm" placeholder="Select material...">
+                                                <option value="">Select material...</option>
+                                                @foreach($inventoryItems as $item)
+                                                    <option value="{{ $item->id }}">{{ $item->item_name }} ({{ $item->uom }})</option>
+                                                @endforeach
+                                            </select>
+                                            <x-text-input type="number" step="0.01" x-model.number="material.quantity" class="block w-32 text-sm" placeholder="Qty" />
+                                            <button type="button" @click="removeMaterial(index)" class="text-red-500 hover:text-red-700 p-1">✖</button>
+                                        </div>
+                                    </template>
+                                </div>
+                                <button type="button" @click="addMaterial()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Add Material</button>
                             </div>
-                            <button type="button" @click="addMaterial()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Add Material</button>
 
-                            {{-- 3. LABOR USED --}}
+                            {{-- 3. LABOR USED (Unchanged) --}}
                             <hr />
                             <h3 class="text-lg font-medium text-gray-900">Labor Used</h3>
                             <div class="space-y-2">
@@ -95,18 +113,17 @@
                             </div>
                             <button type="button" @click="addLabor()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Add Labor</button>
 
-                            {{-- 4. EQUIPMENT USED (NEW) --}}
+                            {{-- 4. EQUIPMENT USED (Unchanged) --}}
                             <hr />
                             <h3 class="text-lg font-medium text-gray-900">Equipment Used</h3>
                             <div class="space-y-2">
                                 <template x-for="(equipment, index) in equipments" :key="index">
                                     <div class="flex items-center space-x-2">
-                                        {{-- Equipment Dropdown --}}
                                         <select x-model="equipment.id" class="tom-select-eq block w-full border-gray-300 text-sm rounded-md shadow-sm" placeholder="Select equipment...">
                                             <option value="">Select equipment...</option>
                                             @foreach($equipments as $eq)
                                                 <option value="{{ $eq->id }}">
-                                                    {{ $eq->name }} 
+                                                    {{ $eq->name }}
                                                     (@if($eq->status == 'rented')
                                                         Rp {{ number_format($eq->rental_rate, 0) }}/{{ $eq->rental_rate_unit }}
                                                     @else
@@ -115,15 +132,12 @@
                                                 </option>
                                             @endforeach
                                         </select>
-                                        {{-- Quantity Input --}}
                                         <x-text-input type="number" step="0.01" x-model.number="equipment.quantity" class="block w-24 text-sm" placeholder="Qty" />
-                                        {{-- Unit Dropdown --}}
                                         <select x-model="equipment.unit" class="block w-28 border-gray-300 text-sm rounded-md shadow-sm">
                                             <option value="Hour">Hour</option>
                                             <option value="Day">Day</option>
                                             <option value="Week">Week</option>
                                         </select>
-                                        {{-- Remove Button --}}
                                         <button type="button" @click="removeEquipment(index)" class="text-red-500 hover:text-red-700 p-1">✖</button>
                                     </div>
                                 </template>
@@ -132,7 +146,6 @@
 
                         </div>
 
-                        {{-- FORM ACTIONS --}}
                         <div class="flex items-center justify-end p-6 bg-gray-50 border-t">
                             <a href="{{ route('projects.show', $project) }}" class="text-sm text-gray-600 hover:text-gray-900 rounded-md mr-4">
                                 {{ __('Cancel') }}
@@ -155,49 +168,47 @@
             materials: initialData.materials,
             labors: initialData.labors,
             equipments: initialData.equipments,
-            tomSelects: { mat: [], lab: [], eq: [] },
+            stockLocationExists: initialData.stockLocationExists, // <-- Get this from PHP
+            tomSelects: { mat: [], lab: [], eq: [], other: [] },
 
             init() {
-                // Initialize existing TomSelects on page load (e.g., from validation error)
                 this.$nextTick(() => {
-                    this.materials.forEach((_, i) => this.initTomSelect('mat', i));
-                    this.labors.forEach((_, i) => this.initTomSelect('lab', i));
-                    this.equipments.forEach((_, i) => this.initTomSelect('eq', i));
+                    this.initializeTomSelect(document.getElementById('quotation_item_id'));
+                    
+                    this.materials.forEach((_, i) => this.initTomSelectInLoop('mat', i));
+                    this.labors.forEach((_, i) => this.initTomSelectInLoop('lab', i));
+                    this.equipments.forEach((_, i) => this.initTomSelectInLoop('eq', i));
                 });
             },
 
-            // --- Material Methods ---
             addMaterial() {
                 this.materials.push({ id: '', quantity: '' });
-                this.$nextTick(() => this.initTomSelect('mat', this.materials.length - 1));
+                this.$nextTick(() => this.initTomSelectInLoop('mat', this.materials.length - 1));
             },
             removeMaterial(index) {
-                this.destroyTomSelect('mat', index);
+                this.destroyTomSelectInLoop('mat', index);
                 this.materials.splice(index, 1);
             },
 
-            // --- Labor Methods ---
             addLabor() {
                 this.labors.push({ id: '', quantity: '' });
-                this.$nextTick(() => this.initTomSelect('lab', this.labors.length - 1));
+                this.$nextTick(() => this.initTomSelectInLoop('lab', this.labors.length - 1));
             },
             removeLabor(index) {
-                this.destroyTomSelect('lab', index);
+                this.destroyTomSelectInLoop('lab', index);
                 this.labors.splice(index, 1);
             },
 
-            // --- Equipment Methods (NEW) ---
             addEquipment() {
-                this.equipments.push({ id: '', quantity: '', unit: 'Day' }); // Default to 'Day'
-                this.$nextTick(() => this.initTomSelect('eq', this.equipments.length - 1));
+                this.equipments.push({ id: '', quantity: '', unit: 'Day' });
+                this.$nextTick(() => this.initTomSelectInLoop('eq', this.equipments.length - 1));
             },
             removeEquipment(index) {
-                this.destroyTomSelect('eq', index);
+                this.destroyTomSelectInLoop('eq', index);
                 this.equipments.splice(index, 1);
             },
 
-            // --- TomSelect Helpers ---
-            initTomSelect(type, index) {
+            initTomSelectInLoop(type, index) {
                 if (typeof TomSelect === 'undefined') return;
                 const el = this.$el.querySelectorAll(`.tom-select-${type}`)[index];
                 if (el && !el.tomselect) {
@@ -207,11 +218,20 @@
                     });
                 }
             },
-            destroyTomSelect(type, index) {
+            destroyTomSelectInLoop(type, index) {
                 if (this.tomSelects[type][index]) {
                     this.tomSelects[type][index].destroy();
                     this.tomSelects[type].splice(index, 1);
                 }
+            },
+            
+            initializeTomSelect(element) {
+                if (typeof TomSelect === 'undefined' || !element || element.tomselect) return;
+                let instance = new TomSelect(element, {
+                    create: false,
+                    sortField: { field: "text", direction: "asc" }
+                });
+                this.tomSelects.other.push(instance);
             }
         }));
     });

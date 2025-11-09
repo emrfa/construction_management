@@ -17,11 +17,11 @@
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Receipt #</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Receipt</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO #</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PO</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th> {{-- New --}}
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
@@ -37,7 +37,7 @@
                                     <td class="px-6 py-4 whitespace-nowrap">{{ $receipt->receipt_date->format('d-M-Y') }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">{{ $receipt->purchaseOrder?->po_number ?? 'N/A' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">{{ $receipt->supplier?->name ?? 'N/A' }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">{{ $receipt->project?->project_code ?? 'N/A' }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-700">{{ $receipt->location?->code ?? 'N/A' }}</td> {{-- New --}}
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
                                             {{ $receipt->status == 'draft' ? 'bg-yellow-200 text-yellow-800' : 'bg-green-200 text-green-800' }}">
@@ -58,7 +58,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="px-6 py-4 whitespace-nowrap text-center text-gray-500">
+                                    <td colspan="7" class="px-6 py-4 whitespace-nowrap text-center text-gray-500"> {{-- Colspan 7 --}}
                                         No receiving documents found.
                                     </td>
                                 </tr>

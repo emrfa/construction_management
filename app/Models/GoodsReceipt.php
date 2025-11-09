@@ -12,7 +12,8 @@ class GoodsReceipt extends Model
 
     protected $fillable = [
         'receipt_no', 'supplier_id', 'purchase_order_id', 'project_id',
-        'received_by_user_id', 'receipt_date', 'status', 'notes'
+        'received_by_user_id', 'receipt_date', 'status', 'notes',
+        'stock_location_id', 'back_order_receipt_id' // <-- Add these
     ];
 
     protected $casts = [
@@ -39,9 +40,20 @@ class GoodsReceipt extends Model
         return $this->belongsTo(User::class, 'received_by_user_id');
     }
 
-    // This is the new source for stock transactions
     public function stockTransactions() {
         return $this->morphMany(StockTransaction::class, 'sourceable');
+    }
+
+    // New relationship
+    public function location()
+    {
+        return $this->belongsTo(StockLocation::class, 'stock_location_id');
+    }
+
+    // New relationship
+    public function backOrderReceipt()
+    {
+        return $this->belongsTo(GoodsReceipt::class, 'back_order_receipt_id');
     }
 
     protected static function boot() {
@@ -61,10 +73,5 @@ class GoodsReceipt extends Model
             }
             $receipt->receipt_no = $prefix . str_pad($number, 4, '0', STR_PAD_LEFT);
         });
-    }
-
-    public function backOrderReceipt()
-    {
-        return $this->belongsTo(GoodsReceipt::class, 'back_order_receipt_id');
     }
 }

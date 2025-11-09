@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(StockLocationSeeder::class);
         // --- THIS IS THE PROPER FLOW ---
 
         // 1. Call the Roles and Permissions seeder first.

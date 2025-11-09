@@ -9,6 +9,7 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\MaterialRequestItem;
 use App\Models\StockTransaction;
+use App\Models\StockLocation; // <-- Add this
 use App\Models\Supplier;
 use App\Models\Project;
 use Illuminate\Http\Request;
@@ -18,47 +19,48 @@ use Illuminate\Validation\Rule;
 
 class GoodsReceiptController extends Controller
 {
-    /**
-     * Display a listing of all receipts (draft and received).
-     */
+
     public function index()
     {
-        $receipts = GoodsReceipt::with('supplier', 'purchaseOrder', 'project')
+        $receipts = GoodsReceipt::with('supplier', 'purchaseOrder', 'project', 'location') // Eager load location
                                 ->latest()->paginate(20);
         return view('goods-receipts.index', compact('receipts'));
     }
 
     /**
-     * Show the form for creating a new NON-PO receipt.
+     * UPDATED: create
+     * Now fetches locations for the Non-PO form
      */
     public function create(Request $request)
     {
-        // This form is ONLY for non-PO receipts
         $suppliers = Supplier::orderBy('name')->get();
         $projects = Project::orderBy('project_code')->get();
         $inventoryItems = InventoryItem::orderBy('item_name')->get();
+        // Fetch all active locations
+        $locations = StockLocation::where('is_active', true)->orderBy('name')->get();
 
         return view('goods-receipts.create', compact(
-            'suppliers', 'projects', 'inventoryItems'
+            'suppliers', 'projects', 'inventoryItems', 'locations'
         ));
     }
 
     /**
-     * Store a new NON-PO receipt. This posts immediately to stock.
+     * UPDATED: store
+     * Now validates and saves stock_location_id
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
             'receipt_date' => 'required|date',
-            'supplier_id' => 'required|exists:suppliers,id',
+            'supplier_id' => 'nullable|exists:suppliers,id',
             'project_id' => 'nullable|exists:projects,id',
+            'stock_location_id' => 'required|exists:stock_locations,id', // <-- New
             'notes' => 'nullable|string',
-            'items_json' => 'required|json', // Use items_json
+            'items_json' => 'required|json',
         ]);
 
         $itemsArray = json_decode($validated['items_json'], true);
 
-        // Validate the items from the JSON
         $itemsValidator = \Illuminate\Support\Facades\Validator::make(['items' => $itemsArray], [
             'items' => 'required|array|min:1',
             'items.*.inventory_item_id' => 'required|exists:inventory_items,id',
@@ -80,12 +82,13 @@ class GoodsReceiptController extends Controller
                 'receipt_date' => $validated['receipt_date'],
                 'supplier_id' => $validated['supplier_id'],
                 'project_id' => $validated['project_id'],
+                'stock_location_id' => $validated['stock_location_id'], // <-- New
                 'notes' => $validated['notes'],
                 'received_by_user_id' => Auth::id(),
                 'status' => 'received',
             ]);
 
-            foreach ($validatedItems as $itemData) { // Use $validatedItems
+            foreach ($validatedItems as $itemData) {
 
                 $grnItem = $goodsReceipt->items()->create([
                     'inventory_item_id' => $itemData['inventory_item_id'],
@@ -95,11 +98,11 @@ class GoodsReceiptController extends Controller
 
                 StockTransaction::create([
                     'inventory_item_id' => $grnItem->inventory_item_id,
+                    'stock_location_id' => $goodsReceipt->stock_location_id, // <-- Changed
                     'quantity' => $grnItem->quantity_received,
                     'unit_cost' => $grnItem->unit_cost,
                     'sourceable_id' => $goodsReceipt->id,
                     'sourceable_type' => GoodsReceipt::class,
-                    'project_id' => $goodsReceipt->project_id, // This will be null if no project is selected
                 ]);
             }
 
@@ -114,7 +117,8 @@ class GoodsReceiptController extends Controller
     }
 
     /**
-     * Display a single POSTED/RECEIVED receipt.
+     * UPDATED: show
+     * Now loads the 'location' relationship
      */
     public function show(GoodsReceipt $goodsReceipt)
     {
@@ -123,12 +127,13 @@ class GoodsReceiptController extends Controller
                               ->with('info', 'This is a draft receipt. Please fill in the received quantities and post it.');
         }
 
-        $goodsReceipt->load('items.inventoryItem', 'supplier', 'project', 'purchaseOrder', 'receiver', 'backOrderReceipt');
+        $goodsReceipt->load('items.inventoryItem', 'supplier', 'project', 'purchaseOrder', 'receiver', 'backOrderReceipt', 'location');
         return view('goods-receipts.show', compact('goodsReceipt'));
     }
 
     /**
-     * Show the form for "fulfilling" a draft PO-based receipt.
+     * UPDATED: edit
+     * Now fetches locations for the PO form
      */
     public function edit(GoodsReceipt $goodsReceipt)
     {
@@ -137,10 +142,14 @@ class GoodsReceiptController extends Controller
                              ->with('error', 'This receipt has already been posted and cannot be edited.');
         }
 
-        $goodsReceipt->load('items.inventoryItem', 'items.purchaseOrderItem', 'purchaseOrder');
+        $goodsReceipt->load('items.inventoryItem', 'items.purchaseOrderItem', 'purchaseOrder.project');
 
-        // Pre-fill items for the form
+        // Fetch all active locations
+        $locations = StockLocation::where('is_active', true)->orderBy('name')->get();
+        
+        // --- This logic is unchanged ---
         $itemsFromPO = $goodsReceipt->items->map(function ($item) {
+            // ... (rest of mapping logic is identical)
             $poItem = $item->purchaseOrderItem;
             $remainingQtyOnPO = 0;
             $qtyOrderedOnPO = 0;
@@ -149,51 +158,45 @@ class GoodsReceiptController extends Controller
             if ($poItem) {
                 $qtyOrderedOnPO = $poItem->quantity_ordered;
                 $qtyAlreadyReceivedOnPO = $poItem->quantity_received;
-                // This is the max this *specific* draft can receive
+
                 $remainingQtyOnPO = $qtyOrderedOnPO - $qtyAlreadyReceivedOnPO;
             }
 
             return [
-                'goods_receipt_item_id' => $item->id, // This is the key
+                'goods_receipt_item_id' => $item->id,
                 'purchase_order_item_id' => $item->purchase_order_item_id,
                 'inventory_item_id' => $item->inventory_item_id,
                 'item_name' => $item->inventoryItem->item_name,
                 'item_code' => $item->inventoryItem->item_code,
                 'uom' => $item->inventoryItem->uom,
                 'quantity_ordered' => $qtyOrderedOnPO,
-                'quantity_already_received_on_po' => $qtyAlreadyReceivedOnPO, // For display
-                'quantity_to_receive' => $remainingQtyOnPO, // Default to receiving all remaining
-                'max_receivable' => $remainingQtyOnPO, // Validation helper
+                'quantity_already_received_on_po' => $qtyAlreadyReceivedOnPO,
+                'quantity_to_receive' => $remainingQtyOnPO,
+                'max_receivable' => $remainingQtyOnPO,
                 'unit_cost' => $item->unit_cost,
                 'is_from_po' => true
             ];
-        })->filter(fn($item) => $item['max_receivable'] > 0.001); // Only show items that still need receiving
+        })->filter(fn($item) => $item['max_receivable'] > 0.001);
 
         if ($itemsFromPO->isEmpty()) {
-             // This draft is now empty because all items were received on *other* drafts.
-             // We can safely delete this empty draft.
              $goodsReceipt->delete();
              return redirect()->route('purchase-orders.show', $goodsReceipt->purchaseOrder)
                                      ->with('info', 'All items on this Purchase Order have already been fully received.');
         }
 
-        return view('goods-receipts.edit', compact('goodsReceipt', 'itemsFromPO'));
+        return view('goods-receipts.edit', compact('goodsReceipt', 'itemsFromPO', 'locations'));
+    }
+
+    public function update(Request $request, GoodsReceipt $goodsReceipt)
+    {
+        return redirect()->route('goods-receipts.edit', $goodsReceipt);
     }
 
     /**
-     * This method is NOT USED for posting receipts. See 'postReceipt'.
-     * This is only here to satisfy the Resource Controller routes.
+     * UPDATED: postReceipt
+     * Now validates stock_location_id and uses it for transactions
      */
-    public function update(Request $request, GoodsReceipt $goodsReceipt)
-    {
-        // Redirect to the correct action
-        return redirect()->route('goods-receipts.edit', $goodsReceipt);
-    }
-    
-    /**
-     * This is the new, smart update logic for posting a draft receipt.
-     */
-   public function postReceipt(Request $request, GoodsReceipt $goodsReceipt)
+    public function postReceipt(Request $request, GoodsReceipt $goodsReceipt)
     {
         if ($goodsReceipt->status !== 'draft') {
             return redirect()->route('goods-receipts.show', $goodsReceipt)
@@ -203,6 +206,7 @@ class GoodsReceiptController extends Controller
         $validated = $request->validate([
             'receipt_date' => 'required|date',
             'notes' => 'nullable|string',
+            'stock_location_id' => 'required|exists:stock_locations,id', // <-- New
             'items' => [
                 'required', 'array', 'min:1',
                 function ($attribute, $value, $fail) {
@@ -237,6 +241,7 @@ class GoodsReceiptController extends Controller
             $goodsReceipt->update([
                 'receipt_date' => $validated['receipt_date'],
                 'notes' => $validated['notes'],
+                'stock_location_id' => $validated['stock_location_id'], // <-- New
                 'received_by_user_id' => Auth::id(),
                 'status' => 'received',
             ]);
@@ -250,11 +255,11 @@ class GoodsReceiptController extends Controller
                 if ($quantityReceivedNow > 0) {
                     StockTransaction::create([
                         'inventory_item_id' => $grnItem->inventory_item_id,
+                        'stock_location_id' => $goodsReceipt->stock_location_id, // <-- Changed
                         'quantity' => $quantityReceivedNow,
                         'unit_cost' => $grnItem->unit_cost,
                         'sourceable_id' => $goodsReceipt->id,
                         'sourceable_type' => GoodsReceipt::class,
-                        'project_id' => $goodsReceipt->project_id,
                     ]);
 
                     $poItem = PurchaseOrderItem::find($grnItem->purchase_order_item_id);
@@ -283,19 +288,21 @@ class GoodsReceiptController extends Controller
             }
 
             if (!empty($newBackOrderItems) && $createBackOrder) {
+                // Back-order receipt inherits the location from the PO,
+                // or it will be set when the user receives *that* draft.
                 $newDraftReceipt = GoodsReceipt::create([
                     'purchase_order_id' => $po->id,
                     'supplier_id' => $po->supplier_id,
                     'project_id' => $po->project_id,
+                    'stock_location_id' => $goodsReceipt->stock_location_id, // Inherit location for now
                     'receipt_date' => now()->toDateString(),
                     'status' => 'draft',
                     'notes' => 'Back-order from ' . $goodsReceipt->receipt_no,
                 ]);
                 $newDraftReceipt->items()->createMany($newBackOrderItems);
 
-                // **NEW:** Link the original receipt to the new back-order
                 $goodsReceipt->back_order_receipt_id = $newDraftReceipt->id;
-                $goodsReceipt->save(); // Save the original receipt
+                $goodsReceipt->save();
             }
 
             $po->refresh();

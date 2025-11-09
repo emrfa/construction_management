@@ -230,6 +230,21 @@
                                    x-show="!lowerSearch || '{{ strtolower(__('Stock Ledger')) }}'.includes(lowerSearch)">
                                     {{ __('Stock Ledger') }}
                                 </a>
+                                <a href="{{ route('reports.stock_balance') }}"
+                                   class="{{ $baseClasses }} {{ request()->routeIs('reports.stock_balance') ? $activeClasses : $inactiveClasses }}"
+                                   x-show="!lowerSearch || '{{ strtolower(__('Stock Balance')) }}'.includes(lowerSearch)">
+                                    {{ __('Stock Balance') }}
+                                </a>
+                                <a href="{{ route('stock-locations.index') }}"
+                                   class="{{ $baseClasses }} {{ request()->routeIs('stock-locations.*') ? $activeClasses : $inactiveClasses }}"
+                                   x-show="!lowerSearch || '{{ strtolower(__('Stock Locations')) }}'.includes(lowerSearch)">
+                                    {{ __('Stock Locations') }}
+                                </a>
+                                <a href="{{ route('stock-overview.index') }}"
+                                   class="{{ $baseClasses }} {{ request()->routeIs('stock-overview.*') ? $activeClasses : $inactiveClasses }}"
+                                   x-show="!lowerSearch || '{{ strtolower(__('Stock Overview')) }}'.includes(lowerSearch)">
+                                    {{ __('Stock Overview') }}
+                                </a>
                                 <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}" x-show="!lowerSearch || 'material usage'.includes(lowerSearch)">Material Usage</a>
                             </div>
                         </div>

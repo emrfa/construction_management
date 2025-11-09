@@ -10,6 +10,17 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
 
+                @if ($errors->any())
+                        <div class="mb-4 p-4 bg-red-100 border border-red-300 text-red-800 rounded-md">
+                            <strong class="font-bold">Whoops! Something went wrong.</strong>
+                            <ul class="mt-2 list-disc list-inside text-sm">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
                     {{-- Use the same Alpine setup as your edit page --}}
                     <div x-data="poForm()"> 
 

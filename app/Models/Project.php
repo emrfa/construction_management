@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\QuotationItem;
 use App\Models\PurchaseOrder;
+use App\Models\StockLocation; // <-- Make sure this is here
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -31,48 +32,34 @@ class Project extends Model
         'actual_end_date' => 'datetime',
     ];
 
-    // A Project belongs to one Quotation
     public function quotation()
     {
         return $this->belongsTo(Quotation::class);
     }
 
-    // A Project belongs to one Client
     public function client()
     {
         return $this->belongsTo(Client::class);
     }
 
-    /**
-     * The "booted" method of the model.
-     */
     protected static function boot()
     {
         parent::boot();
 
-        // Auto-generate project_code when creating a new project
         static::creating(function ($project) {
-            // Get the current year
             $year = date('Y');
-            
-            // Get the last project number for this year
             $lastProject = DB::table('projects')
                                ->where('project_code', 'LIKE', "P-{$year}-%")
                                ->orderBy('project_code', 'desc')
                                ->first();
-
             $number = 1;
             if ($lastProject) {
-                // Extract the last number and increment it
                 $number = (int)substr($lastProject->project_code, -4) + 1;
             }
-
-            // Format the new project number (e.g., P-2025-0001)
             $project->project_code = "P-{$year}-" . str_pad($number, 4, '0', STR_PAD_LEFT);
         });
     }
 
-    // A Project can have many Billings
     public function billings()
     {
         return $this->hasMany(Billing::class);
@@ -83,65 +70,73 @@ class Project extends Model
         return $this->hasMany(MaterialRequest::class);
     }
 
+    /**
+     * Get the dedicated stock location for this project.
+     */
+    public function stockLocation()
+    {
+        return $this->hasOne(StockLocation::class)->where('type', 'site');
+    }
+
+    /**
+     * Get all stock transactions for this project's location.
+     */
     public function stockTransactions()
     {
-        return $this->hasMany(\App\Models\StockTransaction::class);
+        return $this->hasManyThrough(
+            StockTransaction::class,
+            StockLocation::class,
+            'project_id', // Foreign key on StockLocation table
+            'stock_location_id', // Foreign key on StockTransaction table
+            'id', // Local key on Project table
+            'id'  // Local key on StockLocation table
+        );
     }
 
-    public function getMaterialStockSummary()
+    /**
+     * UPDATED: getMaterialStockSummary
+     * This was broken and is now fixed to use the location ID.
+     */
+    public function getMaterialStockSummary(): Collection
     {
-        return \App\Models\InventoryItem::with(['stockTransactions' => function ($q) {
-            $q->where('project_id', $this->id);
-        }])->get()->map(function ($item) {
-            return [
-                'item_code' => $item->item_code,
-                'item_name' => $item->item_name,
-                'uom'       => $item->uom,
-                'quantity'  => $item->stockTransactions->sum('quantity'),
-            ];
-        })->filter(fn($r) => $r['quantity'] != 0);
-    }
+        // Get the project's dedicated location ID
+        $projectLocationId = $this->stockLocation?->id;
 
-    public function getActualCostAttribute()
-    {
-        // 1. Eager load the root quotation items.
-        // We already fixed the 'actual_cost' on the QuotationItem model,
-        // so we can just trust its calculation.
-        $this->loadMissing('quotation.items');
+        // Get all stock transactions for *this* project's location
+        $projectStock = StockTransaction::where('stock_location_id', $projectLocationId)
+                             ->groupBy('inventory_item_id')
+                             ->select('inventory_item_id', DB::raw('SUM(quantity) as on_hand_qty'))
+                             ->get()
+                             ->keyBy('inventory_item_id');
 
-        if (!$this->quotation) {
-            return 0;
+        // Get all "on order" items for *this* project
+        $projectPOs = $this->purchaseOrders()
+            ->whereIn('status', ['ordered', 'partially_received'])
+            ->with('items')
+            ->get();
+            
+        $onOrderQuantities = collect();
+        foreach ($projectPOs as $po) {
+            foreach ($po->items as $poItem) {
+                $qtyOutstanding = (float)$poItem->quantity_ordered - (float)$poItem->quantity_received;
+                if ($qtyOutstanding > 0) {
+                    $onOrderQuantities[$poItem->inventory_item_id] = ($onOrderQuantities[$poItem->inventory_item_id] ?? 0) + $qtyOutstanding;
+                }
+            }
         }
 
-        // 2. Sum the 'actual_cost' attribute of all root items.
-        // Each root item will recursively sum its children,
-        // giving us the total for the entire project.
-        return $this->quotation->items->sum('actual_cost');
-    }
+        // Get all "used" items on *this* project
+        $usageTotals = MaterialUsage::whereHas('progressUpdate.quotationItem.quotation', fn($q) => $q->where('id', $this->quotation_id))
+            ->select('inventory_item_id', DB::raw('SUM(quantity_used) as total_used'))
+            ->groupBy('inventory_item_id')
+            ->get()
+            ->keyBy('inventory_item_id');
 
-    // HELPER: Get remaining project budget
-    public function getBudgetLeftAttribute()
-    {
-        // Ensure total_budget and actual_cost are treated as numbers
-        return (float)$this->total_budget - (float)$this->getActualCostAttribute();
-    }
-    /**
-     * Generates a detailed summary of materials based on WBS requirements for the project.
-     *
-     * @return Collection
-     */
-    public function getWbsMaterialSummary(): Collection
-    {
-        $this->loadMissing([
-            'quotation.allItems.unitRateAnalysis.materials.inventoryItem',
-            'quotation.allItems.progressUpdates.materialUsages',
-            'purchaseOrders.items.inventoryItem', // Ensure PO relationship exists
-            'stockTransactions.item'
-        ]);
-
+        // Get all "budgeted" items for *this* project
+        $this->loadMissing('quotation.allItems.unitRateAnalysis.materials.inventoryItem');
+        
         $materialSummary = collect();
-
-        // 1. Calculate Budgeted Quantities
+        
         if ($this->quotation) {
             foreach ($this->quotation->allItems as $wbsItem) {
                 if ($wbsItem->children->isEmpty() && $wbsItem->unitRateAnalysis && $wbsItem->unitRateAnalysis->materials->isNotEmpty()) {
@@ -154,7 +149,7 @@ class Project extends Model
 
                             if ($materialSummary->has($inventoryItemId)) {
                                 $currentItem = $materialSummary->get($inventoryItemId);
-                                $currentItem['budgeted_qty'] += $budgetedQtyForItem; // Fix applied
+                                $currentItem['budgeted_qty'] += $budgetedQtyForItem;
                                 $materialSummary->put($inventoryItemId, $currentItem);
                             } else {
                                 $materialSummary->put($inventoryItemId, [
@@ -174,72 +169,42 @@ class Project extends Model
             }
         }
 
-        // 2. Calculate Used Quantities
-        if ($this->quotation) {
-            foreach($this->quotation->allItems as $wbsItem) {
-                if($wbsItem->progressUpdates->isNotEmpty()) {
-                    foreach($wbsItem->progressUpdates as $update) {
-                        foreach($update->materialUsages as $usage) {
-                            $inventoryItemId = $usage->inventory_item_id;
-                            if($materialSummary->has($inventoryItemId)) {
-                                // --- Apply Get/Modify/Put here ---
-                                $currentItem = $materialSummary->get($inventoryItemId);
-                                $currentItem['used_qty'] += (float)$usage->quantity_used; // Fix applied
-                                $materialSummary->put($inventoryItemId, $currentItem);
-                                // --- End fix ---
-                            }
-                            // Else: material used wasn't budgeted, ignore for now
-                        }
-                    }
-                }
-            }
-        }
+        // --- START OF FIX ---
+        // We can't modify the collection with $materialSummary[$itemId]['key'] = ...
+        // We have to get the item, modify it, and put() it back.
+        foreach ($materialSummary as $itemId => $details) {
+            // 1. Get the current item (which is an array)
+            $currentItem = $materialSummary->get($itemId); 
+            
+            // 2. Modify the array
+            $currentItem['used_qty'] = $usageTotals->get($itemId)?->total_used ?? 0;
+            $currentItem['on_order_qty'] = $onOrderQuantities->get($itemId) ?? 0;
+            $currentItem['on_hand_qty'] = $projectStock->get($itemId)?->on_hand_qty ?? 0;
 
-        // 3. Calculate On Order Quantities
-        if ($this->purchaseOrders->isNotEmpty()) { // Check the relationship exists
-            foreach ($this->purchaseOrders as $po) {
-                if (in_array($po->status, ['ordered', 'partially_received'])) {
-                    foreach ($po->items as $poItem) {
-                        $inventoryItemId = $poItem->inventory_item_id;
-                        $qtyOutstanding = (float)$poItem->quantity_ordered - (float)$poItem->quantity_received;
-                        if ($qtyOutstanding > 0 && $materialSummary->has($inventoryItemId)) {
-                             // --- Apply Get/Modify/Put here ---
-                             $currentItem = $materialSummary->get($inventoryItemId);
-                             $currentItem['on_order_qty'] += $qtyOutstanding; // Fix applied
-                             $materialSummary->put($inventoryItemId, $currentItem);
-                             // --- End fix ---
-                        }
-                        // Else: PO item wasn't budgeted, ignore for now
-                    }
-                }
-            }
+            // 3. Put the modified array back into the collection
+            $materialSummary->put($itemId, $currentItem);
         }
-
-        // 4. Calculate On Hand Quantities (Specific to this Project)
-        $projectStock = $this->stockTransactions
-                             ->groupBy('inventory_item_id')
-                             ->map(fn ($transactions) => $transactions->sum('quantity'));
-
-        foreach ($projectStock as $inventoryItemId => $quantity) {
-             if ($materialSummary->has($inventoryItemId)) {
-                 // --- Apply Get/Modify/Put here ---
-                 $currentItem = $materialSummary->get($inventoryItemId);
-                 $currentItem['on_hand_qty'] = (float)$quantity; // Fix applied (direct assignment is ok)
-                 $materialSummary->put($inventoryItemId, $currentItem);
-                 // --- End fix ---
-            }
-        }
+        // --- END OF FIX ---
 
         return $materialSummary->sortBy('item_code')->values();
+    }
+
+    public function getActualCostAttribute()
+    {
+        $this->loadMissing('quotation.items');
+        if (!$this->quotation) {
+            return 0;
+        }
+        return $this->quotation->items->sum('actual_cost');
+    }
+
+    public function getBudgetLeftAttribute()
+    {
+        return (float)$this->total_budget - (float)$this->getActualCostAttribute();
     }
 
     public function purchaseOrders()
     {
         return $this->hasMany(PurchaseOrder::class);
-    }
-
-    public function laborUsages()
-    {
-        return $this->hasMany(LaborUsage::class);
     }
 }

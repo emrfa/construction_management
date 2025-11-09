@@ -49,6 +49,28 @@
                                 <x-input-label :value="__('Supplier')" />
                                 <p class="mt-2 text-gray-700">{{ $goodsReceipt->supplier->name }}</p>
                             </div>
+
+                            {{-- NEW: Stock Location Dropdown --}}
+                            <div class="md:col-span-2">
+                                <x-input-label for="stock_location_id" :value="__('Receive To Location')" />
+                                <select id="stock_location_id" name="stock_location_id" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm" x-init="initializeTomSelect($el)" required>
+                                    <option value="">Select a location...</option>
+                                    @foreach ($locations as $location)
+                                        <option value="{{ $location->id }}"
+                                            {{-- Pre-select if it was already set, or if it's the only location for a project PO --}}
+                                            @if($goodsReceipt->stock_location_id == $location->id)
+                                                selected
+                                            @elseif(is_null($goodsReceipt->stock_location_id) && $goodsReceipt->purchaseOrder->project?->stockLocation?->id == $location->id)
+                                                selected
+                                            @endif
+                                        >
+                                            {{ $location->name }} ({{ $location->code }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('stock_location_id')" class="mt-2" />
+                            </div>
+                            
                             <div class="md:col-span-3">
                                 <x-input-label for="notes" :value="__('Notes')" />
                                 <textarea id="notes" name="notes" rows="2" class="block mt-1 w-full border-gray-300 rounded-md shadow-sm">{{ old('notes', $goodsReceipt->notes) }}</textarea>
@@ -100,12 +122,11 @@
                             {{ __('Cancel') }}
                         </a>
                         <x-primary-button class="ml-4" type="submit">
-                            {{ __( 'Receive Items') }}
+                            {{ __('Post Received Items') }}
                         </x-primary-button>
                     </div>
                 </form>
 
-                {{-- NEW: Confirmation Modal --}}
                 <x-modal name="confirm-back-order" focusable>
                     <div class="p-6">
                         <h2 class="text-lg font-medium text-gray-900">
@@ -116,15 +137,14 @@
                         </p>
                         <div class="mt-6 flex justify-end space-x-3">
                             <x-secondary-button x-on:click="submitChoice('close')">
-                                Mark as Fully Received
+                                Close PO (No Back-order)
                             </x-secondary-button>
                             <x-primary-button x-on:click="submitChoice('create')">
-                                Create Back-order
+                                Create Back-order (Recommended)
                             </x-primary-button>
                         </div>
                     </div>
                 </x-modal>
-                {{-- END: Confirmation Modal --}}
 
             </div>
         </div>
@@ -134,15 +154,25 @@
     <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('receiptForm', () => ({
+            tomSelectInstances: {}, // Store TomSelect instances
+
+            // Helper to init TomSelect
+            initializeTomSelect(element) {
+                if (element && !element.tomselect) {
+                    let instance = new TomSelect(element, {
+                        create: false,
+                        sortField: { field: "text", direction: "asc" }
+                    });
+                    this.tomSelectInstances[element.id] = instance;
+                }
+            },
             
-            // This function is called by the modal buttons
             submitChoice(choice) {
                 this.$refs.backOrderAction.value = choice;
-                this.$dispatch('close-modal', 'confirm-back-order'); // Close the modal
-                this.$refs.receiptForm.submit(); // Manually submit the form
+                this.$dispatch('close-modal', 'confirm-back-order');
+                this.$refs.receiptForm.submit();
             },
 
-            // This function intercepts the main form submit
             handleSubmit() {
                 let isReceivingSomething = false;
                 let totalQty = 0;
@@ -165,15 +195,11 @@
                     totalMax += max;
                 }
                 
-                // Is this a partial receipt?
                 const isPartial = isReceivingSomething && totalQty < (totalMax - 0.001);
 
                 if (isPartial) {
-                    // It's partial. Stop the submit and open the modal.
                     this.$dispatch('open-modal', 'confirm-back-order');
                 } else {
-                    // It's not partial (or user is receiving 0). 
-                    // Set default action and submit normally.
                     this.$refs.backOrderAction.value = 'create';
                     this.$refs.receiptForm.submit();
                 }

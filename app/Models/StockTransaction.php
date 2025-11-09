@@ -15,18 +15,26 @@ class StockTransaction extends Model
         'unit_cost',
         'sourceable_id',
         'sourceable_type',
-        'project_id',
+        'stock_location_id', 
     ];
 
-    // Get the item this transaction belongs to
+
     public function item()
     {
         return $this->belongsTo(InventoryItem::class, 'inventory_item_id');
     }
 
-    // Get the source model (e.g., a PurchaseOrder)
+
     public function sourceable()
     {
         return $this->morphTo();
+    }
+
+    /**
+     * Defines the relationship to the StockLocation model.
+     */
+    public function stockLocation()
+    {
+        return $this->belongsTo(StockLocation::class);
     }
 }

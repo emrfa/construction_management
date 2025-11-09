@@ -12,23 +12,19 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('stock_transactions', function (Blueprint $table) {
-         $table->id();
+        $table->id();
 
-        // Links to the Item Master
-        $table->foreignId('inventory_item_id')->constrained()->onDelete('cascade');
+            $table->foreignId('inventory_item_id')->constrained()->onDelete('cascade');
+            
+            // This is the new location link
+            $table->foreignId('stock_location_id')->constrained('stock_locations')->onDelete('restrict');
 
-        // The + or - quantity
-        // e.g., +100 for Stock In, -25 for Stock Out
-        $table->decimal('quantity', 15, 2); 
+            $table->decimal('quantity', 15, 2);
+            $table->decimal('unit_cost', 15, 2)->default(0);
 
-        // The cost of this transaction
-        $table->decimal('unit_cost', 15, 2)->default(0); 
+            $table->morphs('sourceable');
 
-        // Links to the source (e.g., a PO or a Project)
-        // We use a "polymorphic" relationship for this
-        $table->morphs('sourceable'); // Creates `sourceable_id` and `sourceable_type`
-
-        $table->timestamps();
+            $table->timestamps();
         });
     }
 

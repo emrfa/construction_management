@@ -11,6 +11,8 @@ use App\Models\MaterialRequest;
 use App\Models\MaterialRequestItem;
 use App\Models\GoodsReceipt;
 use App\Models\GoodsReceiptItem;
+use App\Models\Project;
+use App\Models\StockLocation;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -265,26 +267,43 @@ class PurchaseOrderController extends Controller
                                        ->where('status', 'draft')
                                        ->exists();
 
-        // Only create a new draft if one doesn't already exist
-        if (!$existingReceipt) {
-            $goodsReceipt = GoodsReceipt::create([
-                'purchase_order_id' => $purchaseOrder->id,
-                'supplier_id' => $purchaseOrder->supplier_id,
-                'project_id' => $purchaseOrder->project_id, // This will be null if the PO's project_id is null
-                'receipt_date' => $purchaseOrder->expected_delivery_date ?? now()->toDateString(),
-                'status' => 'draft',
-                'notes' => 'Auto-generated from PO ' . $purchaseOrder->po_number,
-            ]);
+        if ($existingReceipt) {
+            return; // A draft already exists, do nothing
+        }
 
-            foreach ($purchaseOrder->items as $poItem) {
-                GoodsReceiptItem::create([
-                    'goods_receipt_id' => $goodsReceipt->id,
-                    'purchase_order_item_id' => $poItem->id,
-                    'inventory_item_id' => $poItem->inventory_item_id,
-                    'quantity_received' => 0, // A draft receipt starts with 0
-                    'unit_cost' => $poItem->unit_cost,
-                ]);
-            }
+        // --- NEW LOGIC ---
+        $locationId = null;
+        if ($purchaseOrder->project_id) {
+            // This PO is for a project. Find that project's location.
+            $projectLocation = Project::find($purchaseOrder->project_id)?->stockLocation;
+            $locationId = $projectLocation?->id;
+        }
+        
+        if (!$locationId) {
+            // Not a project PO, or project has no location.
+            // Default to the "Main Warehouse"
+            $locationId = StockLocation::where('code', 'WH-MAIN')->value('id');
+        }
+        // --- END NEW LOGIC ---
+
+        $goodsReceipt = GoodsReceipt::create([
+            'purchase_order_id' => $purchaseOrder->id,
+            'supplier_id' => $purchaseOrder->supplier_id,
+            'project_id' => $purchaseOrder->project_id,
+            'stock_location_id' => $locationId, // <-- Set the found ID
+            'receipt_date' => $purchaseOrder->expected_delivery_date ?? now()->toDateString(),
+            'status' => 'draft',
+            'notes' => 'Auto-generated from PO ' . $purchaseOrder->po_number,
+        ]);
+
+        foreach ($purchaseOrder->items as $poItem) {
+            GoodsReceiptItem::create([
+                'goods_receipt_id' => $goodsReceipt->id,
+                'purchase_order_item_id' => $poItem->id,
+                'inventory_item_id' => $poItem->inventory_item_id,
+                'quantity_received' => 0, 
+                'unit_cost' => $poItem->unit_cost,
+            ]);
         }
     }
 
@@ -301,21 +320,35 @@ class PurchaseOrderController extends Controller
         $validated = $request->validate([
             'status' => [
                 'required',
-                // Define allowed statuses users can manually set (add more later)
                 Rule::in(['ordered', 'cancelled', 'draft']),
             ],
         ]);
 
         $newStatus = $validated['status'];
+        $message = 'PO status updated successfully.';
 
-        // Add logic checks later (e.g., cannot cancel if received)
-        // For now, just update
+        if ($newStatus == 'ordered') {
+            // Add validation checks before marking as ordered
+            $purchaseOrder->load('items');
+            if(empty($purchaseOrder->supplier_id)) {
+                return back()->with('error', 'Cannot mark as ordered without a supplier.');
+            }
+            $itemsWithZeroCost = $purchaseOrder->items->filter(fn($item) => $item->unit_cost <= 0)->count();
+            if ($itemsWithZeroCost > 0) {
+                return back()->with('error', 'Cannot mark as ordered when items have zero unit cost.');
+            }
+
+            // All checks passed, create the receipt
+            $this->createDraftGoodsReceipt($purchaseOrder);
+            $message = 'Purchase Order marked as Ordered and draft receipt created.';
+        }
+        
         $purchaseOrder->status = $newStatus;
         $purchaseOrder->save();
 
         return redirect()->route('purchase-orders.show', $purchaseOrder)
-                        ->with('success', 'PO status updated successfully.');
-    }   
+                        ->with('success', $message);
+    }  
 
     /**
      * Show the form for receiving items for a Purchase Order.
