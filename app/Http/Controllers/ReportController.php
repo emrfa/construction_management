@@ -413,7 +413,8 @@ class ReportController extends Controller
             ])
             ->select('inventory_item_id', 'stock_location_id', DB::raw('SUM(quantity) as on_hand')) // <-- Use stock_location_id
             ->groupBy('inventory_item_id', 'stock_location_id') // <-- Use stock_location_id
-            ->having('on_hand', '!=', 0) // Only show items with stock
+            //->having('on_hand', '!=', 0) // Only show items with stock
+            ->having(DB::raw('SUM(quantity)'), '!=', 0)
             ->get();
 
         // Sort the results by item code, then by location name

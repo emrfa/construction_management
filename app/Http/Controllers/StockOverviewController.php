@@ -34,7 +34,8 @@ class StockOverviewController extends Controller
             ->select('inventory_item_id', DB::raw('SUM(quantity) as on_hand_qty'))
             ->where('stock_location_id', $stockLocation->id)
             ->groupBy('inventory_item_id')
-            ->having('on_hand_qty', '!=', 0); // Optimization
+           // ->having('on_hand_qty', '!=', 0); // for sql
+           ->having(DB::raw('SUM(quantity)'), '!=', 0);
 
         // 2. Get ON ORDER quantities for this location
         // This is defined as items on DRAFT Goods Receipts linked to this location
@@ -45,7 +46,8 @@ class StockOverviewController extends Controller
             ->where('goods_receipts.stock_location_id', $stockLocation->id)
             ->where('goods_receipts.status', 'draft') // Only DRAFT receipts count as "on order"
             ->groupBy('purchase_order_items.inventory_item_id')
-            ->having('on_order_qty', '>', 0);
+            //->having('on_order_qty', '>', 0);
+            ->having(DB::raw('SUM(purchase_order_items.quantity_ordered - purchase_order_items.quantity_received)'), '>', 0);
         
         // 3. Get all inventory items involved
         $inventoryItemIds = $onHand->pluck('inventory_item_id')
