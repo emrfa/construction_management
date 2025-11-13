@@ -68,14 +68,18 @@ class DashboardController extends Controller
         ];
 
         // === 4. Project Health KPIs (Complex Calculations) ===
-        $activeProjects = Project::with('quotation.allItems.progressUpdates')
+        $activeProjects = Project::with([
+                'quotation.allItems.progressUpdates', // Eager load all WBS items and their progress
+                'quotation.allItems.progressUpdates.materialUsages', 
+                'quotation.allItems.progressUpdates.laborUsages', 
+                'quotation.allItems.progressUpdates.equipmentUsages'
+            ])
             ->whereIn('status', ['initiated', 'in_progress'])
             ->get();
         
         $activeProjectsCount = $activeProjects->count();
         $projectsOnTrackCount = 0;
         
-        // [NEW] Variables for new KPIs
         $totalCostVariance = 0;
         $totalEarnedValue = 0;
         $totalActualCost = 0;
@@ -83,18 +87,20 @@ class DashboardController extends Controller
 
         foreach ($activeProjects as $project) {
             
-            $project->actual_progress = $project->quotation->items->avg('latest_progress') ?? 0;
+            // [FIXED] Calculate Actual Progress using the CORRECT weighted average
+            $project->actual_progress = $this->getWbsActualProgress($project);
+            
+            // Calculate Planned Progress
             $project->planned_progress = $this->getWbsPlannedProgress($project);
 
+            // Check Schedule
             if ($project->actual_progress >= $project->planned_progress - 0.01) {
                 $projectsOnTrackCount++;
             }
             
-            $project->loadMissing('quotation.allItems.progressUpdates.materialUsages', 'quotation.allItems.progressUpdates.laborUsages', 'quotation.allItems.progressUpdates.equipmentUsages');
-            
-            // [NEW] Calculate EV, AC, and CV for each project
-            $project->actual_cost = $project->quotation->items->sum('actual_cost');
-            $project->earned_value = $project->total_budget * ($project->actual_progress / 100);
+            // Calculate EV, AC, and CV for each project
+            $project->actual_cost = $project->quotation->allItems->sum('actual_cost'); // Summing accessor is fine
+            $project->earned_value = (float)$project->total_budget * ($project->actual_progress / 100);
             $project->cost_variance = $project->earned_value - $project->actual_cost;
 
             // Add to totals
@@ -107,14 +113,12 @@ class DashboardController extends Controller
             $costVarianceChartData['data'][] = $project->cost_variance;
         }
 
-        // [NEW] Calculate final Cost Performance Index (CPI)
         $totalCpi = ($totalActualCost > 0) ? $totalEarnedValue / $totalActualCost : 1;
 
         return view('dashboard', [
             'activeProjectsCount' => $activeProjectsCount,
             'projectsOnTrackCount' => $projectsOnTrackCount,
             
-            // [NEW] Pass new KPIs to the view
             'totalCostVariance' => $totalCostVariance,
             'totalCpi' => $totalCpi,
 
@@ -123,16 +127,38 @@ class DashboardController extends Controller
             'procurementBacklogCount' => $procurementBacklogCount,
 
             'cashFlowChartData' => $cashFlowChartData,
-            'costVarianceChartData' => $costVarianceChartData, // [NEW] Pass chart data
+            'costVarianceChartData' => $costVarianceChartData,
             
             'pendingRequests' => $pendingRequests,
             'latePurchaseOrders' => $latePurchaseOrders,
-            'activeProjects' => $activeProjects, // This now contains EV, AC, and CV
+            'activeProjects' => $activeProjects,
         ]);
     }
 
     /**
-     * Calculates the expected project completion percentage based on the WBS schedule.
+     * [NEW] Calculates the "Akumulasi Actual" using a budget-weighted average.
+     */
+    private function getWbsActualProgress(Project $project): float
+    {
+        $totalBudget = (float) $project->total_budget;
+        if ($totalBudget == 0) {
+            return 0;
+        }
+
+        $tasks = $project->quotation->allItems->filter(fn($item) => $item->children->isEmpty());
+        $totalEarnedValue = 0;
+
+        foreach ($tasks as $task) {
+            $taskWeight = (float)$task->subtotal; // The budget of the task
+            $taskProgress = (float)$task->latest_progress; // The actual % complete
+            $totalEarnedValue += $taskWeight * ($taskProgress / 100);
+        }
+
+        return round(($totalEarnedValue / $totalBudget) * 100, 2);
+    }
+
+    /**
+     * Calculates the "Akumulasi Rencana" based on the WBS schedule.
      */
     private function getWbsPlannedProgress(Project $project): float
     {
@@ -141,7 +167,7 @@ class DashboardController extends Controller
             return 0;
         }
 
-        $project->loadMissing('quotation.allItems');
+        $project->loadMissing('quotation.allItems'); // Ensure allItems are loaded
         $tasks = $project->quotation->allItems->filter(fn($item) => $item->children->isEmpty());
         $today = Carbon::today();
         $totalPlannedValue = 0;
