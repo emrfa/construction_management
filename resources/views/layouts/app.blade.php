@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
-        <meta charset="utf-8">
+        <meta charset="utf-t">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
@@ -34,25 +34,53 @@
     <body class="font-sans antialiased">
         <div class="h-screen bg-gray-100 flex">
             {{-- === SIDEBAR === --}}
-            <aside class="w-64 bg-gradient-to-b from-slate-800 to-slate-900 shadow-md p-4 flex-shrink-0 flex flex-col h-full" x-data="{ searchTerm: '', get lowerSearch() { return this.searchTerm.toLowerCase() } }">
+            {{-- 
+              [MODIFIED]
+              - New "Premium Dark" theme: bg-gradient-to-b from-[#1D2B41] to-[#0F172A] (deep blue/charcoal).
+              - Border color updated to match.
+              - Search bar colors updated to match.
+              - Menu header text updated to text-gray-500.
+              - Menu header arrow size reduced to h-3 w-3 and color to text-gray-500.
+              - Breathing room added: main nav container space-y-4 -> space-y-6.
+              - State persistence for menus is retained.
+            --}}
+            <aside class="w-64 bg-gradient-to-b from-[#1D2B41] to-[#0F172A] shadow-lg border-r border-gray-700 p-4 flex-shrink-0 flex flex-col h-full" 
+                   x-data="{ 
+                       searchTerm: '', 
+                       get lowerSearch() { return this.searchTerm.toLowerCase() },
+                       openSections: JSON.parse(localStorage.getItem('openSections')) || {
+                           main: true,
+                           sales: true,
+                           projects: true,
+                           procurement: true,
+                           workLibrary: true,
+                           inventory: true,
+                           billing: true,
+                           reports: true,
+                           settings: true
+                       }
+                   }"
+                   x-init="$watch('openSections', (value) => {
+                       localStorage.setItem('openSections', JSON.stringify(value))
+                   })">
                 
-                <div class="pb-4 mb-4 border-b border-slate-700 flex-shrink-0">
+                <div class="pb-4 mb-4 border-b border-gray-700/60 flex-shrink-0">
                     <a href="{{ route('dashboard') }}" class="flex items-center justify-center">
                         <x-application-logo class="block h-16 w-auto fill-current text-white" />
                     </a>
                 </div>
 
-                <div class="pb-4 mb-4 border-b border-slate-700 flex-shrink-0">
+                <div class="pb-4 mb-4 border-b border-gray-700/60 flex-shrink-0">
                     <form onsubmit="return false;">
                         <x-input-label for="sidebar-search" class="sr-only">Search</x-input-label>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" aria-hidden="true">
-                                <svg class="h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                             </div>
                             <x-text-input id="sidebar-search" 
-                                          class="block mt-1 w-full pl-10 bg-slate-700 text-white border-slate-600 placeholder-slate-400 focus:border-white focus:ring-white" 
+                                          class="block mt-1 w-full pl-10 bg-gray-800/50 text-gray-200 border-gray-700 placeholder-gray-400 focus:border-indigo-500 focus:ring-indigo-500" 
                                           type="text" 
                                           name="search" 
                                           placeholder="Search..." 
@@ -64,19 +92,25 @@
                 
                 @php
                 $baseClasses = 'block w-full text-left px-4 py-2 text-sm rounded-md transition duration-150';
-                $activeClasses = 'bg-white text-slate-900 font-semibold';
-                $inactiveClasses = 'text-slate-200 hover:bg-slate-700 hover:text-white';
-                $deadLinkClasses = 'text-slate-500 cursor-not-allowed';
+                $activeClasses = 'bg-indigo-600 text-white font-semibold';
+                $inactiveClasses = 'text-gray-300 hover:bg-gray-700/50 hover:text-white';
+                $deadLinkClasses = 'text-gray-600 cursor-not-allowed';
                 @endphp
                 
-                <div class="flex-1 overflow-y-auto space-y-4 sidebar-scroll">
+                <div class="flex-1 overflow-y-auto space-y-6 sidebar-scroll">
                     <nav>
+                        {{-- [MODIFIED] Section: Main --}}
                         <div x-show="!lowerSearch || 'Main'.toLowerCase().includes(lowerSearch) || '{{ strtolower(__('Dashboard')) }}'.includes(lowerSearch)">
-                            <h3 class="text-xs uppercase text-slate-400 font-bold mb-2 flex items-center {{ request()->routeIs('dashboard') ? 'text-white' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-                                <span>Main</span>
-                            </h3>
-                            <div class="mt-2 space-y-1.5">
+                            <button type="button" @click="openSections.main = !openSections.main" class="w-full flex items-center justify-between text-xs uppercase text-gray-500 font-bold mb-2 hover:text-white {{ request()->routeIs('dashboard') ? 'text-white' : '' }}">
+                                <span class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                                    <span>Main</span>
+                                </span>
+                                <svg class="h-3 w-3 text-gray-500 transform transition-transform" :class="{ 'rotate-180': !openSections.main }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div class="mt-2 space-y-1.5" x-show="openSections.main" x-transition>
                                 <a href="{{ route('dashboard') }}" 
                                    class="{{ $baseClasses }} {{ request()->routeIs('dashboard') ? $activeClasses : $inactiveClasses }}"
                                    x-show="!lowerSearch || '{{ strtolower(__('Dashboard')) }}'.includes(lowerSearch)">
@@ -85,13 +119,19 @@
                             </div>
                         </div>
 
+                        {{-- [MODIFIED] Section: Sales --}}
                         @canany(['manage clients', 'manage quotations'])
                         <div x-show="!lowerSearch || 'Sales'.toLowerCase().includes(lowerSearch) || '{{ strtolower(__('Clients')) }}'.includes(lowerSearch) || '{{ strtolower(__('Quotations')) }}'.includes(lowerSearch)">
-                            <h3 class="text-xs uppercase text-slate-400 font-bold mb-2 flex items-center {{ request()->routeIs('clients.*') || request()->routeIs('quotations.*') ? 'text-white' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                                <span>Sales</span>
-                            </h3>
-                            <div class="mt-2 space-y-1.5">
+                            <button type="button" @click="openSections.sales = !openSections.sales" class="w-full flex items-center justify-between text-xs uppercase text-gray-500 font-bold mb-2 hover:text-white {{ request()->routeIs('clients.*') || request()->routeIs('quotations.*') ? 'text-white' : '' }}">
+                                <span class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                    <span>Sales</span>
+                                </span>
+                                <svg class="h-3 w-3 text-gray-500 transform transition-transform" :class="{ 'rotate-180': !openSections.sales }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div class="mt-2 space-y-1.5" x-show="openSections.sales" x-transition>
                                 @can('manage clients')
                                 <a href="{{ route('clients.index') }}" 
                                    class="{{ $baseClasses }} {{ request()->routeIs('clients.*') ? $activeClasses : $inactiveClasses }}"
@@ -110,13 +150,19 @@
                         </div>
                         @endcanany
 
+                        {{-- [MODIFIED] Section: Projects --}}
                         @if(auth()->user()->can('view all projects') || auth()->user()->can('view own projects'))
                         <div x-show="!lowerSearch || 'Projects'.toLowerCase().includes(lowerSearch) || '{{ strtolower(__('Project List')) }}'.includes(lowerSearch) || 'project tasks (wbs)'.includes(lowerSearch) || 'progress updates'.includes(lowerSearch)">
-                            <h3 class="text-xs uppercase text-slate-400 font-bold mb-2 flex items-center {{ request()->routeIs('projects.*') ? 'text-white' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-                                <span>Projects</span>
-                            </h3>
-                            <div class="mt-2 space-y-1.5">
+                            <button type="button" @click="openSections.projects = !openSections.projects" class="w-full flex items-center justify-between text-xs uppercase text-gray-500 font-bold mb-2 hover:text-white {{ request()->routeIs('projects.*') ? 'text-white' : '' }}">
+                                <span class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                                    <span>Projects</span>
+                                </span>
+                                <svg class="h-3 w-3 text-gray-500 transform transition-transform" :class="{ 'rotate-180': !openSections.projects }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div class="mt-2 space-y-1.5" x-show="openSections.projects" x-transition>
                                 <a href="{{ route('projects.index') }}" 
                                    class="{{ $baseClasses }} {{ request()->routeIs('projects.*') ? $activeClasses : $inactiveClasses }}"
                                    x-show="!lowerSearch || '{{ strtolower(__('Project List')) }}'.includes(lowerSearch)">
@@ -128,13 +174,19 @@
                         </div>
                         @endif
 
+                        {{-- [MODIFIED] Section: Procurement --}}
                         @canany(['manage suppliers', 'manage purchase_orders', 'create material_request'])
                         <div x-show="!lowerSearch || 'Procurement'.toLowerCase().includes(lowerSearch) || '{{ strtolower(__('Suppliers')) }}'.includes(lowerSearch) || '{{ strtolower(__('Purchase Orders')) }}'.includes(lowerSearch)">
-                            <h3 class="text-xs uppercase text-slate-400 font-bold mb-2 flex items-center {{ request()->routeIs('suppliers.*') || request()->routeIs('purchase-orders.*') ? 'text-white' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                                <span>Procurement</span>
-                            </h3>
-                            <div class="mt-2 space-y-1.5">
+                            <button type="button" @click="openSections.procurement = !openSections.procurement" class="w-full flex items-center justify-between text-xs uppercase text-gray-500 font-bold mb-2 hover:text-white {{ request()->routeIs('suppliers.*') || request()->routeIs('purchase-orders.*') ? 'text-white' : '' }}">
+                                <span class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                                    <span>Procurement</span>
+                                </span>
+                                <svg class="h-3 w-3 text-gray-500 transform transition-transform" :class="{ 'rotate-180': !openSections.procurement }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div class="mt-2 space-y-1.5" x-show="openSections.procurement" x-transition>
                                 @can('manage suppliers')
                                 <a href="{{ route('suppliers.index') }}"
                                    class="{{ $baseClasses }} {{ request()->routeIs('suppliers.*') ? $activeClasses : $inactiveClasses }}"
@@ -153,13 +205,19 @@
                         </div>
                         @endcanany
 
+                        {{-- [MODIFIED] Section: Work Library --}}
                         @canany(['manage ahs_library', 'manage work_types', 'manage work_items'])
                         <div x-show="!lowerSearch || 'Work Library'.toLowerCase().includes(lowerSearch) || '{{ strtolower(__('AHS Library')) }}'.includes(lowerSearch) || '{{ strtolower(__('Work Types')) }}'.includes(lowerSearch) || '{{ strtolower(__('Work Items')) }}'.includes(lowerSearch)">
-                            <h3 class="text-xs uppercase text-slate-400 font-bold mb-2 flex items-center {{ request()->routeIs('ahs-library.*') || request()->routeIs('work-types.*') || request()->routeIs('work-items.*') ? 'text-white' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                                <span>Work Library</span>
-                            </h3>
-                            <div class="mt-2 space-y-1.5">
+                            <button type="button" @click="openSections.workLibrary = !openSections.workLibrary" class="w-full flex items-center justify-between text-xs uppercase text-gray-500 font-bold mb-2 hover:text-white {{ request()->routeIs('ahs-library.*') || request()->routeIs('work-types.*') || request()->routeIs('work-items.*') ? 'text-white' : '' }}">
+                                <span class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                                    <span>Work Library</span>
+                                </span>
+                                <svg class="h-3 w-3 text-gray-500 transform transition-transform" :class="{ 'rotate-180': !openSections.workLibrary }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div class="mt-2 space-y-1.5" x-show="openSections.workLibrary" x-transition>
                                 @can('manage ahs_library')
                                 <a href="{{ route('ahs-library.index') }}"
                                    class="{{ $baseClasses }} {{ request()->routeIs('ahs-library.*') ? $activeClasses : $inactiveClasses }}"
@@ -185,13 +243,19 @@
                         </div>
                         @endcanany
                         
+                        {{-- [MODIFIED] Section: Inventory --}}
                         @if(auth()->user()->can('manage inventory') || auth()->user()->can('view inventory'))
                         <div x-show="!lowerSearch || 'Inventory'.toLowerCase().includes(lowerSearch) || '{{ strtolower(__('Item Master')) }}'.includes(lowerSearch) || '{{ strtolower(__('Item Categories')) }}'.includes(lowerSearch) || '{{ strtolower(__('Equipment')) }}'.includes(lowerSearch) || '{{ strtolower(__('Labor Rates')) }}'.includes(lowerSearch) || '{{ strtolower(__('Stock Ledger')) }}'.includes(lowerSearch) || 'material usage'.includes(lowerSearch)">
-                            <h3 class="text-xs uppercase text-slate-400 font-bold mb-2 flex items-center {{ request()->routeIs('inventory-items.*') || request()->routeIs('item-categories.*') || request()->routeIs('equipment.*') || request()->routeIs('labor-rates.*') || request()->routeIs('stock-ledger.*') ? 'text-white' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                                <span>Inventory</span>
-                            </h3>
-                            <div class="mt-2 space-y-1.5">
+                            <button type="button" @click="openSections.inventory = !openSections.inventory" class="w-full flex items-center justify-between text-xs uppercase text-gray-500 font-bold mb-2 hover:text-white {{ request()->routeIs('inventory-items.*') || request()->routeIs('item-categories.*') || request()->routeIs('equipment.*') || request()->routeIs('labor-rates.*') || request()->routeIs('stock-ledger.*') || request()->routeIs('goods-receipts.*') || request()->routeIs('stock-locations.*') || request()->routeIs('stock-adjustments.*') || request()->routeIs('stock-overview.*') ? 'text-white' : '' }}">
+                                <span class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                    <span>Inventory</span>
+                                </span>
+                                <svg class="h-3 w-3 text-gray-500 transform transition-transform" :class="{ 'rotate-180': !openSections.inventory }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div class="mt-2 space-y-1.5" x-show="openSections.inventory" x-transition>
                                 @can('manage inventory')
                                 <a href="{{ route('goods-receipts.index') }}"
                                 class="{{ $baseClasses }} {{ request()->routeIs('goods-receipts.*') ? $activeClasses : $inactiveClasses }}"
@@ -259,13 +323,19 @@
                         </div>
                         @endif
 
+                        {{-- [MODIFIED] Section: Billing --}}
                         @canany(['manage billings', 'manage invoices', 'manage payments'])
                         <div x-show="!lowerSearch || 'Billing'.toLowerCase().includes(lowerSearch) || '{{ strtolower(__('Billings')) }}'.includes(lowerSearch) || '{{ strtolower(__('Invoices')) }}'.includes(lowerSearch) || 'payments'.includes(lowerSearch)">
-                            <h3 class="text-xs uppercase text-slate-400 font-bold mb-2 flex items-center {{ request()->routeIs('billings.*') || request()->routeIs('invoices.*') ? 'text-white' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg>
-                                <span>Billing</span>
-                            </h3>
-                            <div class="mt-2 space-y-1.5">
+                            <button type="button" @click="openSections.billing = !openSections.billing" class="w-full flex items-center justify-between text-xs uppercase text-gray-500 font-bold mb-2 hover:text-white {{ request()->routeIs('billings.*') || request()->routeIs('invoices.*') ? 'text-white' : '' }}">
+                                <span class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg>
+                                    <span>Billing</span>
+                                </span>
+                                <svg class="h-3 w-3 text-gray-500 transform transition-transform" :class="{ 'rotate-180': !openSections.billing }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div class="mt-2 space-y-1.5" x-show="openSections.billing" x-transition>
                                 @can('manage billings')
                                 <a href="{{ route('billings.index') }}"
                                    class="{{ $baseClasses }} {{ request()->routeIs('billings.*') ? $activeClasses : $inactiveClasses }}"
@@ -287,24 +357,36 @@
                         </div>
                         @endcanany
 
+                        {{-- [MODIFIED] Section: Reports --}}
                         @role('Admin')
                         <div x-show="!lowerSearch || 'Reports'.toLowerCase().includes(lowerSearch) || 'project costing'.includes(lowerSearch) || 'inventory levels'.includes(lowerSearch)">
-                            <h3 class="text-xs uppercase text-slate-400 font-bold mb-2 flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                <span>Reports</span>
-                            </h3>
-                            <div class="mt-2 space-y-1.5">
+                            <button type="button" @click="openSections.reports = !openSections.reports" class="w-full flex items-center justify-between text-xs uppercase text-gray-500 font-bold mb-2 hover:text-white">
+                                <span class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                    <span>Reports</span>
+                                </span>
+                                <svg class="h-3 w-3 text-gray-500 transform transition-transform" :class="{ 'rotate-180': !openSections.reports }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div class="mt-2 space-y-1.5" x-show="openSections.reports" x-transition>
                                 <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}" x-show="!lowerSearch || 'project costing'.includes(lowerSearch)">Project Costing</a>
                                 <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}" x-show="!lowerSearch || 'inventory levels'.includes(lowerSearch)">Inventory Levels</a>
                             </div>
                         </div>
                         
+                        {{-- [MODIFIED] Section: Settings --}}
                         <div x-show="!lowerSearch || 'Settings'.toLowerCase().includes(lowerSearch) || 'users & roles'.includes(lowerSearch) || 'company details'.includes(lowerSearch) || 'manage roles'.includes(lowerSearch)">
-                            <h3 class="text-xs uppercase text-slate-400 font-bold mb-2 flex items-center {{ request()->routeIs('users.*') || request()->routeIs('roles.*') ? 'text-white' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                <span>Settings</span>
-                            </h3>
-                            <div class="mt-2 space-y-1.5">
+                            <button type="button" @click="openSections.settings = !openSections.settings" class="w-full flex items-center justify-between text-xs uppercase text-gray-500 font-bold mb-2 hover:text-white {{ request()->routeIs('users.*') || request()->routeIs('roles.*') ? 'text-white' : '' }}">
+                                <span class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    <span>Settings</span>
+                                </span>
+                                <svg class="h-3 w-3 text-gray-500 transform transition-transform" :class="{ 'rotate-180': !openSections.settings }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div class="mt-2 space-y-1.5" x-show="openSections.settings" x-transition>
                                 <a href="{{ route('users.index') }}" 
                                    class="{{ $baseClasses }} {{ request()->routeIs('users.*') ? $activeClasses : $inactiveClasses }}" 
                                    x-show="!lowerSearch || 'users & roles'.includes(lowerSearch)">
@@ -321,10 +403,10 @@
                         @endrole
                     </nav>
 
-                    <div class="flex-shrink-0 mt-6 pt-4 border-t border-slate-700">
+                    <div class="flex-shrink-0 mt-6 pt-4 border-t border-gray-700/60">
                         <div class="px-4 py-2">
                             <div class="text-sm font-semibold text-white">{{ Auth::user()->name }}</div>
-                            <div class="text-xs text-slate-300">{{ Auth::user()->email }}</div>
+                            <div class="text-xs text-gray-400">{{ Auth::user()->email }}</div>
                         </div>
                         
                         <a href="{{ route('profile.edit') }}" 
@@ -341,7 +423,8 @@
                             </a>
                         </form>
                     </div>
-                </div> </aside>
+                </div> 
+            </aside>
             
             {{-- === MAIN CONTENT === --}}
             <div class="flex-1 overflow-y-auto">
@@ -362,4 +445,4 @@
         
         @stack('scripts')
     </body>
-</html>
+</html> 
