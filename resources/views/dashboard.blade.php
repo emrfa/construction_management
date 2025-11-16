@@ -24,7 +24,84 @@
                 return $sign . '<span class="text-2xl align-top">Rp</span>' . number_format($absVal, 0);
             }
             @endphp
-            
+            {{-- 5. Active Projects Rich Table --}}
+            <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Active Project Health</h3>
+                <div class="mt-4 border rounded-lg overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style="min-width: 200px;">Progress (Actual vs. Planned)</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Budget vs. Actual (Rp)</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @forelse($activeProjects as $project)
+                                @php
+                                    $isDelayed = $project->actual_progress < $project->planned_progress;
+                                    $isOverBudget = $project->cost_variance < 0; // Use the CV we already calculated
+                                @endphp
+                                <tr>
+                                    <td class="px-4 py-3 whitespace-nowrap">
+                                        <a
+                                            href="{{ route('reports.project_performance', $project) }}" class="transition duration-150">
+                                        <div class="text-sm font-medium text-gray-900 group-hover:text-indigo-600">{{ $project->quotation->project_name }}</div>
+                                        <div class="text-xs text-gray-500">{{ $project->project_code }}</div>
+                                        </a>
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ $project->client->name }}</td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                        <div class="w-full bg-gray-200 rounded-full h-2.5 relative">
+                                            {{-- Planned progress marker --}}
+                                            @if($project->planned_progress > 0)
+                                            <div class="absolute h-4 w-1 bg-red-500 -top-1 rounded" 
+                                                 style="left: calc({{ $project->planned_progress }}% - 2px);" 
+                                                 title="Planned: {{ number_format($project->planned_progress, 1) }}%">
+                                            </div>
+                                            @endif
+                                            {{-- Actual progress bar --}}
+                                            <div class="bg-indigo-600 h-2.5 rounded-full" 
+                                                 style="width: {{ $project->actual_progress }}%"
+                                                 title="Actual: {{ number_format($project->actual_progress, 1) }}%">
+                                            </div>
+                                        </div>
+                                        <div class="text-xs font-semibold text-indigo-600 text-right mt-1">
+                                            {{ number_format($project->actual_progress, 1) }}%
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                        <div class="font-medium {{ $isOverBudget ? 'text-red-600' : 'text-gray-900' }}">
+                                            {{ number_format($project->actual_cost, 0) }}
+                                        </div>
+                                        <div class="text-xs text-gray-500">
+                                            / {{ number_format($project->total_budget, 0) }}
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                        @if($isDelayed && $project->planned_progress > $project->actual_progress)
+                                            <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                                Delayed
+                                            </span>
+                                        @else
+                                            <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                On Track
+                                            </span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="px-4 py-4 text-center text-sm text-gray-500">No active projects found.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             {{-- 1. Premium KPI Cards [MODIFIED] --}}
             <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6">
                 
@@ -165,84 +242,7 @@
                 </div>
             </div>
 
-            {{-- 5. Active Projects Rich Table --}}
-            <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Active Project Health</h3>
-                <div class="mt-4 border rounded-lg overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style="min-width: 200px;">Progress (Actual vs. Planned)</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Budget vs. Actual (Rp)</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @forelse($activeProjects as $project)
-                                @php
-                                    $isDelayed = $project->actual_progress < $project->planned_progress;
-                                    $isOverBudget = $project->cost_variance < 0; // Use the CV we already calculated
-                                @endphp
-                                <tr>
-                                    <td class="px-4 py-3 whitespace-nowrap">
-                                        <a
-                                            href="{{ route('reports.project_performance', $project) }}" class="transition duration-150">
-                                        <div class="text-sm font-medium text-gray-900 group-hover:text-indigo-600">{{ $project->quotation->project_name }}</div>
-                                        <div class="text-xs text-gray-500">{{ $project->project_code }}</div>
-                                        </a>
-                                    </td>
-                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ $project->client->name }}</td>
-                                    <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                        <div class="w-full bg-gray-200 rounded-full h-2.5 relative">
-                                            {{-- Planned progress marker --}}
-                                            @if($project->planned_progress > 0)
-                                            <div class="absolute h-4 w-1 bg-red-500 -top-1 rounded" 
-                                                 style="left: calc({{ $project->planned_progress }}% - 2px);" 
-                                                 title="Planned: {{ number_format($project->planned_progress, 1) }}%">
-                                            </div>
-                                            @endif
-                                            {{-- Actual progress bar --}}
-                                            <div class="bg-indigo-600 h-2.5 rounded-full" 
-                                                 style="width: {{ $project->actual_progress }}%"
-                                                 title="Actual: {{ number_format($project->actual_progress, 1) }}%">
-                                            </div>
-                                        </div>
-                                        <div class="text-xs font-semibold text-indigo-600 text-right mt-1">
-                                            {{ number_format($project->actual_progress, 1) }}%
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                        <div class="font-medium {{ $isOverBudget ? 'text-red-600' : 'text-gray-900' }}">
-                                            {{ number_format($project->actual_cost, 0) }}
-                                        </div>
-                                        <div class="text-xs text-gray-500">
-                                            / {{ number_format($project->total_budget, 0) }}
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                        @if($isDelayed && $project->planned_progress > $project->actual_progress)
-                                            <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                                Delayed
-                                            </span>
-                                        @else
-                                            <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                On Track
-                                            </span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="px-4 py-4 text-center text-sm text-gray-500">No active projects found.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
+            
         </div>
     </div>
 
