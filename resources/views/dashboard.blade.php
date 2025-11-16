@@ -177,7 +177,6 @@
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style="min-width: 200px;">Progress (Actual vs. Planned)</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Budget vs. Actual (Rp)</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
-                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -188,8 +187,11 @@
                                 @endphp
                                 <tr>
                                     <td class="px-4 py-3 whitespace-nowrap">
-                                        <div class="text-sm font-medium text-gray-900">{{ $project->quotation->project_name }}</div>
+                                        <a
+                                            href="{{ route('reports.project_performance', $project) }}" class="transition duration-150">
+                                        <div class="text-sm font-medium text-gray-900 group-hover:text-indigo-600">{{ $project->quotation->project_name }}</div>
                                         <div class="text-xs text-gray-500">{{ $project->project_code }}</div>
+                                        </a>
                                     </td>
                                     <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ $project->client->name }}</td>
                                     <td class="px-4 py-3 whitespace-nowrap text-sm">
@@ -229,9 +231,6 @@
                                                 On Track
                                             </span>
                                         @endif
-                                    </td>
-                                    <td class="px-4 py-3 whitespace-nowrap text-right text-sm">
-                                        <a href="{{ route('projects.show', $project) }}" class="text-indigo-600 hover:text-indigo-800 font-medium">View</a>
                                     </td>
                                 </tr>
                             @empty
