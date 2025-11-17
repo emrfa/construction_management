@@ -12,12 +12,24 @@ class StockLocationController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $locations = StockLocation::with('project.quotation')
+        // Start query
+        $query = StockLocation::with('project.quotation')
             ->orderBy('type')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+            
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('code', 'like', "%{$search}%")
+                     ->orWhere('name', 'like', "%{$search}%")
+                     ->orWhereHas('project', function ($subQuery) use ($search) {
+                         $subQuery->where('project_code', 'like', "%{$search}%");
+                     });
+        });
+            
+        // [MODIFIED] Paginate the query
+        $locations = $query->paginate(15)->appends($request->query());
             
         return view('stock-locations.index', compact('locations'));
     }

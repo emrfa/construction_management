@@ -11,9 +11,21 @@ class SupplierController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $suppliers = Supplier::orderBy('name')->get();
+        // Start query
+        $query = Supplier::query()->orderBy('name');
+
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('name', 'like', "%{$search}%")
+                     ->orWhere('contact_person', 'like', "%{$search}%")
+                     ->orWhere('email', 'like', "%{$search}%");
+        });
+        
+        // [MODIFIED] Paginate the query
+        $suppliers = $query->paginate(15)->appends($request->query());
+        
         return view('suppliers.index', compact('suppliers'));
     }
 

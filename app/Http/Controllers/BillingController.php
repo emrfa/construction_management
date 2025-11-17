@@ -14,10 +14,25 @@ class BillingController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request) 
     {
-        // Eager load the related project
-        $billings = Billing::with('project.quotation')->latest()->get();
+        // Start query
+        $query = Billing::with('project.quotation')->latest();
+
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('billing_no', 'like', "%{$search}%")
+                     ->orWhereHas('project', function ($subQuery) use ($search) {
+                         $subQuery->where('project_code', 'like', "%{$search}%")
+                                  ->orWhereHas('quotation', function ($subSubQuery) use ($search) {
+                                      $subSubQuery->where('project_name', 'like', "%{$search}%");
+                                  });
+                     });
+        });
+
+        // [MODIFIED] Paginate the query
+        $billings = $query->paginate(15)->appends($request->query());
+        
         return view('billings.index', compact('billings'));
     }
 

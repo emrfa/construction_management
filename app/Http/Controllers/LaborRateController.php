@@ -11,9 +11,19 @@ class LaborRateController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $laborRates = LaborRate::orderBy('labor_type')->get();
+        // Start query
+        $query = LaborRate::query()->orderBy('labor_type');
+
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('labor_type', 'like', "%{$search}%");
+        });
+        
+        // [MODIFIED] Paginate the query
+        $laborRates = $query->paginate(15)->appends($request->query());
+        
         return view('labor-rates.index', compact('laborRates'));
     }
 

@@ -14,10 +14,24 @@ class ProjectController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        // We use with('client') to efficiently get the client's name
-        $projects = Project::with('client')->latest()->get();
+        // Start query
+        $query = Project::with(['client', 'quotation'])->latest();
+
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('project_code', 'like', "%{$search}%")
+                     ->orWhereHas('quotation', function ($subQuery) use ($search) {
+                         $subQuery->where('project_name', 'like', "%{$search}%");
+                     })
+                     ->orWhereHas('client', function ($subQuery) use ($search) {
+                         $subQuery->where('name', 'like', "%{$search}%");
+                     });
+        });
+        
+        // [MODIFIED] Paginate the query
+        $projects = $query->paginate(15)->appends($request->query());
 
         return view('projects.index', compact('projects'));
     }

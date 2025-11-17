@@ -16,11 +16,25 @@ class StockAdjustmentController extends Controller
     /**
      * Display a listing of the resource. (The Log)
      */
-    public function index()
+    public function index(Request $request)
     {
-        $adjustments = StockAdjustment::with('location', 'user')
-            ->latest()
-            ->paginate(20);
+        // Start query
+        $query = StockAdjustment::with('location', 'user')->latest();
+        
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('adjustment_no', 'like', "%{$search}%")
+                     ->orWhere('reason', 'like', "%{$search}%")
+                     ->orWhereHas('user', function ($subQuery) use ($search) {
+                         $subQuery->where('name', 'like', "%{$search}%");
+                     })
+                     ->orWhereHas('location', function ($subQuery) use ($search) {
+                         $subQuery->where('name', 'like', "%{$search}%");
+                     });
+        });
+        
+        // [MODIFIED] Paginate the query
+        $adjustments = $query->paginate(20)->appends($request->query());
         
         return view('stock-adjustments.index', compact('adjustments'));
     }

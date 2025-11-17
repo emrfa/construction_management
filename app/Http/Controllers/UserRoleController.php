@@ -14,9 +14,20 @@ class UserRoleController extends Controller
     /**
      * Display a listing of the users.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::with('roles')->latest()->paginate(20);
+        // Start query
+        $query = User::with('roles')->latest();
+        
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('name', 'like', "%{$search}%")
+                     ->orWhere('email', 'like', "%{$search}%");
+        });
+        
+        // [MODIFIED] Paginate the query
+        $users = $query->paginate(20)->appends($request->query());
+        
         return view('users.index', compact('users'));
     }
 

@@ -4,6 +4,9 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Session\TokenMismatchException;
+
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log; 
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface; 
@@ -24,6 +27,16 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->renderable(function (Throwable $e, $request) {
             
+            if ($e instanceof TokenMismatchException) {
+                return redirect()->route('login')
+                    ->withInput($request->except('password', '_token'))
+                    ->withErrors(['email' => 'Your session has expired. Please log in again.']);
+            }
+            if ($e instanceof \Illuminate\Auth\AuthenticationException) {
+                return $request->expectsJson()
+                    ? response()->json(['message' => 'Unauthenticated.'], 401)
+                    : redirect()->guest(route('login'));
+            }
             // Only run this custom logic IF we are in production (APP_DEBUG=false)
             if (!config('app.debug')) {
                 

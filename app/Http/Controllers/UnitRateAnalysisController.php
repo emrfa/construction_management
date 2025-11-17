@@ -26,9 +26,20 @@ class UnitRateAnalysisController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+   public function index(Request $request)
     {
-        $analyses = UnitRateAnalysis::orderBy('code')->paginate(20);
+        // Start query
+        $query = UnitRateAnalysis::query()->orderBy('code');
+        
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('code', 'like', "%{$search}%")
+                     ->orWhere('name', 'like', "%{$search}%");
+        });
+        
+        // [MODIFIED] Paginate the query
+        $analyses = $query->paginate(20)->appends($request->query());
+        
         return view('ahs-library.index', compact('analyses'));
     }
 

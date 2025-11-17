@@ -23,9 +23,22 @@ class PurchaseOrderController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $purchaseOrders = PurchaseOrder::with('supplier')->latest()->get();
+        // Start query
+        $query = PurchaseOrder::with('supplier')->latest();
+        
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('po_number', 'like', "%{$search}%")
+                     ->orWhereHas('supplier', function ($subQuery) use ($search) {
+                         $subQuery->where('name', 'like', "%{$search}%");
+                     });
+        });
+        
+        // [MODIFIED] Paginate the query
+        $purchaseOrders = $query->paginate(15)->appends($request->query());
+        
         return view('purchase-orders.index', compact('purchaseOrders'));
     }
 

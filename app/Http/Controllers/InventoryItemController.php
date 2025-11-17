@@ -23,23 +23,28 @@ class InventoryItemController extends Controller
      */
     public function index(Request $request)
     {
-        // Get categories for the filter dropdown
+        /// Get data for filters
         $categories = ItemCategory::orderBy('name')->get();
+        
+        // **NEW**: Get all items for the name filter
+        $allitems = InventoryItem::orderBy('item_name')->get(); 
 
         // Start the query
         $query = InventoryItem::query()
             ->with('itemCategory') 
             ->orderBy('item_name');
 
-        // Apply search filter (if present)
-        $query->when($request->search, function ($q, $search) {
-            return $q->where('item_name', 'like', "%{$search}%")
-                     ->orWhere('item_code', 'like', "%{$search}%");
+        // **UPDATED**: Handle new multi-select name filter
+        $query->when($request->names, function ($q, $names) {
+            return $q->whereIn('item_name', $names);
         });
 
-        // Apply category filter (if present)
-        $query->when($request->category, function ($q, $category_id) {
-            return $q->where('category_id', $category_id);
+        // **REMOVED**: Old single-string search
+        // $query->when($request->search, ...);
+
+        // **UPDATED**: Handle new multi-select category filter
+        $query->when($request->categories, function ($q, $categories) {
+            return $q->whereIn('category_id', $categories);
         });
 
         // Paginate the results
@@ -49,6 +54,7 @@ class InventoryItemController extends Controller
         return view('inventory-items.index', [
             'items' => $items,
             'categories' => $categories,
+            'allitems' => $allitems, // **NEW**: Pass all items to the view
         ]);
     }
 

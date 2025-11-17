@@ -11,9 +11,21 @@ class ClientController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $clients = Client::all();
+        // Start the query
+        $query = Client::query()->orderBy('name');
+
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('name', 'like', "%{$search}%")
+                     ->orWhere('email', 'like', "%{$search}%")
+                     ->orWhere('company_name', 'like', "%{$search}%");
+        });
+
+        // [MODIFIED] Paginate the query
+        $clients = $query->paginate(15)->appends($request->query());
+
         return view('clients.index', compact('clients'));
     }
 

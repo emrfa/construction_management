@@ -11,10 +11,25 @@ class InvoiceController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        // Eager load the related client and billing info
-        $invoices = Invoice::with(['client', 'billing.project.quotation'])->latest()->get();
+        // Start query
+        $query = Invoice::with(['client', 'billing.project.quotation'])->latest();
+
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('invoice_no', 'like', "%{$search}%")
+                     ->orWhereHas('client', function ($subQuery) use ($search) {
+                         $subQuery->where('name', 'like', "%{$search}%");
+                     })
+                     ->orWhereHas('billing.project.quotation', function ($subQuery) use ($search) {
+                         $subQuery->where('project_name', 'like', "%{$search}%");
+                     });
+        });
+
+        // [MODIFIED] Paginate the query
+        $invoices = $query->paginate(15)->appends($request->query());
+
         return view('invoices.index', compact('invoices'));
     }
 

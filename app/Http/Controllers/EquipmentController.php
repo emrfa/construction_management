@@ -13,11 +13,20 @@ class EquipmentController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $equipmentItems = Equipment::with('supplier')
-                                ->latest() // Order by creation date, newest first
-                                ->paginate(15); // Use pagination
+        // Start query
+        $query = Equipment::with('supplier')->latest();
+        
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('name', 'like', "%{$search}%")
+                     ->orWhere('identifier', 'like', "%{$search}%")
+                     ->orWhere('type', 'like', "%{$search}%");
+        });
+
+        // [MODIFIED] Paginate the query
+        $equipmentItems = $query->paginate(15)->appends($request->query());
 
         return view('equipment.index', compact('equipmentItems'));
     }

@@ -28,22 +28,22 @@ class QuotationController extends Controller
      */
    public function index(Request $request)
     {
-        // Get data for filters
+        // Get data for filter dropdowns
         $clients = Client::orderBy('name')->get();
         $statuses = ['draft', 'sent', 'approved', 'rejected'];
 
         // Start query
         $query = Quotation::with('client')->latest();
 
-        // Apply text search (Quotation # or Project Name)
+        // [UPDATED] unified search: Quote #, Project Name, OR Client Name
         $query->when($request->search, function ($q, $search) {
-            return $q->where('quotation_no', 'like', "%{$search}%")
-                     ->orWhere('project_name', 'like', "%{$search}%");
-        });
-
-        // Apply client filter
-        $query->when($request->client, function ($q, $client_id) {
-            return $q->where('client_id', $client_id);
+            return $q->where(function ($subQ) use ($search) {
+                $subQ->where('quotation_no', 'like', "%{$search}%")
+                     ->orWhere('project_name', 'like', "%{$search}%")
+                     ->orWhereHas('client', function ($clientQ) use ($search) {
+                         $clientQ->where('name', 'like', "%{$search}%");
+                     });
+            });
         });
 
         // Apply status filter
@@ -59,7 +59,7 @@ class QuotationController extends Controller
             return $q->where('date', '<=', $date_to);
         });
 
-        // Paginate results and keep filters on page links
+        // Paginate results
         $quotations = $query->paginate(15)->appends($request->query());
 
         return view('quotations.index', compact('quotations', 'clients', 'statuses'));

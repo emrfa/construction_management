@@ -13,9 +13,18 @@ class WorkItemController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-       $workItems = WorkItem::orderBy('name')->paginate(15);
+        // Start query
+        $query = WorkItem::query()->orderBy('name');
+        
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('name', 'like', "%{$search}%");
+        });
+        
+        // [MODIFIED] Paginate the query
+        $workItems = $query->paginate(15)->appends($request->query());
     
         return view('work-items.index', compact('workItems'));
     }

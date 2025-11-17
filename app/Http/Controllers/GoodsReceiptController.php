@@ -20,10 +20,25 @@ use Illuminate\Validation\Rule;
 class GoodsReceiptController extends Controller
 {
 
-    public function index()
+    public function index(Request $request)
     {
-        $receipts = GoodsReceipt::with('supplier', 'purchaseOrder', 'project', 'location') // Eager load location
-                                ->latest()->paginate(20);
+        // Start query
+        $query = GoodsReceipt::with('supplier', 'purchaseOrder', 'project', 'location')->latest();
+        
+        // **NEW**: Apply search logic
+        $query->when($request->search, function ($q, $search) {
+            return $q->where('receipt_no', 'like', "%{$search}%")
+                     ->orWhereHas('purchaseOrder', function ($subQuery) use ($search) {
+                         $subQuery->where('po_number', 'like', "%{$search}%");
+                     })
+                     ->orWhereHas('supplier', function ($subQuery) use ($search) {
+                         $subQuery->where('name', 'like', "%{$search}%");
+                     });
+        });
+
+        // [MODIFIED] Paginate the query
+        $receipts = $query->paginate(20)->appends($request->query());
+        
         return view('goods-receipts.index', compact('receipts'));
     }
 
