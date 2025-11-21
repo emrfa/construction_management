@@ -15,6 +15,7 @@
                         <form method="POST" action="{{ route('quotations.store') }}">
                             @csrf
                             <input type="hidden" name="items_json" :value="JSON.stringify(items)">
+                            <input type="hidden" name="overrides_json" :value="JSON.stringify(overrides)">
 
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                                 <div>
@@ -33,6 +34,16 @@
                                 <div>
                                     <label for="date" class="block font-medium text-sm text-gray-700">{{ __('Date') }}</label>
                                     <input id="date" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" type="date" name="date" value="{{ old('date', date('Y-m-d')) }}" required />
+                                </div>
+                                <div class="flex justify-end mb-4">
+                                    <button type="button" 
+                                            @click="openPricelistModal()"
+                                            class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Manage Project Prices
+                                    </button>
                                 </div>
                             </div>
 
@@ -219,6 +230,92 @@
                                     <button type="submit" class="ml-4 inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700"> {{ __('Save Quotation') }} </button>
                                 </div>
                         </form>
+                        <x-modal name="pricelist-modal" focusable>
+                            <div class="p-6">
+                                <h2 class="text-lg font-medium text-gray-900 mb-4">Project Price List (Global Override)</h2>
+                                <p class="text-sm text-gray-600 mb-4">
+                                    Adjusting a price here will update <strong>all</strong> AHS items in this quotation that use this resource.
+                                </p>
+
+                                <div class="border-b border-gray-200 mb-4">
+                                    <nav class="-mb-px flex space-x-8">
+                                        <button @click="activeTab = 'material'" :class="{'border-indigo-500 text-indigo-600': activeTab === 'material', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'material'}" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Materials</button>
+                                        <button @click="activeTab = 'labor'" :class="{'border-indigo-500 text-indigo-600': activeTab === 'labor', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'labor'}" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Labor</button>
+                                        <button @click="activeTab = 'equipment'" :class="{'border-indigo-500 text-indigo-600': activeTab === 'equipment', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'equipment'}" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Equipment</button>
+                                    </nav>
+                                </div>
+
+                                <div x-show="isLoading" class="text-center py-8">
+                                    <svg class="animate-spin h-8 w-8 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    <p class="mt-2 text-sm text-gray-500">Loading resources...</p>
+                                </div>
+
+                                <div x-show="!isLoading && activeTab === 'material'" class="overflow-y-auto max-h-96">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th><th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Default Price</th><th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Project Price</th></tr></thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            <template x-for="item in resources.materials" :key="item.id">
+                                                <tr>
+                                                    <td class="px-3 py-2 text-sm text-gray-900">
+                                                        <div class="font-medium" x-text="item.name"></div>
+                                                        <div class="text-xs text-gray-500" x-text="item.code"></div>
+                                                    </td>
+                                                    <td class="px-3 py-2 text-sm text-right text-gray-500" x-text="formatCurrency(item.default_price)"></td>
+                                                    <td class="px-3 py-2 text-right">
+                                                        <input type="number" step="0.01" 
+                                                            x-model="overrides.material[item.id]" 
+                                                            :placeholder="item.default_price"
+                                                            class="w-32 text-right text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                            <tr x-show="resources.materials.length === 0"><td colspan="3" class="px-3 py-4 text-center text-sm text-gray-500">No materials found in this quotation.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div x-show="!isLoading && activeTab === 'labor'" class="overflow-y-auto max-h-96">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Labor Type</th><th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Default Rate</th><th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Project Rate</th></tr></thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            <template x-for="item in resources.labors" :key="item.id">
+                                                <tr>
+                                                    <td class="px-3 py-2 text-sm text-gray-900" x-text="item.name"></td>
+                                                    <td class="px-3 py-2 text-sm text-right text-gray-500" x-text="formatCurrency(item.default_price)"></td>
+                                                    <td class="px-3 py-2 text-right">
+                                                        <input type="number" step="0.01" x-model="overrides.labor[item.id]" :placeholder="item.default_price" class="w-32 text-right text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                            <tr x-show="resources.labors.length === 0"><td colspan="3" class="px-3 py-4 text-center text-sm text-gray-500">No labor items found.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div x-show="!isLoading && activeTab === 'equipment'" class="overflow-y-auto max-h-96">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Equipment</th><th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Default Rate</th><th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Project Rate</th></tr></thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            <template x-for="item in resources.equipments" :key="item.id">
+                                                <tr>
+                                                    <td class="px-3 py-2 text-sm text-gray-900" x-text="item.name"></td>
+                                                    <td class="px-3 py-2 text-sm text-right text-gray-500" x-text="formatCurrency(item.default_price)"></td>
+                                                    <td class="px-3 py-2 text-right">
+                                                        <input type="number" step="0.01" x-model="overrides.equipment[item.id]" :placeholder="item.default_price" class="w-32 text-right text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                            <tr x-show="resources.equipments.length === 0"><td colspan="3" class="px-3 py-4 text-center text-sm text-gray-500">No equipment found.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="mt-6 flex justify-end space-x-3">
+                                    <x-secondary-button x-on:click="$dispatch('close')">Cancel</x-secondary-button>
+                                    <x-primary-button x-on:click="applyPricelist()">Apply & Recalculate</x-primary-button>
+                                </div>
+                            </div>
+                        </x-modal>
                     </div> 
                 </div>
             </div>
@@ -227,287 +324,372 @@
 
     @push('head-scripts')
     <script>
-window.rabBuilder = function(ahsLibraryData, workTypesLibrary, oldItems, workItemsLibrary) {
-    return {
-        items: oldItems || [],
-        ahsData: ahsLibraryData,
-        library: {
-            workTypes: workTypesLibrary,
-            workItems: workItemsLibrary
-        },
-        initSelectCounter: 0,
+    window.rabBuilder = function(ahsLibraryData, workTypesLibrary, oldItems, workItemsLibrary) {
+        return {
+            items: oldItems || [],
+            ahsData: ahsLibraryData,
+            library: {
+                workTypes: workTypesLibrary,
+                workItems: workItemsLibrary
+            },
+            initSelectCounter: 0,
 
-        init() {
-            if (typeof TomSelect === 'undefined') {
-                console.warn('TomSelect not loaded. Select dropdowns will not be enhanced.');
-            }
+            // --- NEW PROPERTIES (MOVED INSIDE) ---
+            activeTab: 'material',
+            isLoading: false,
+            resources: { materials: [], labors: [], equipments: [] },
+            // The Overrides Object (Stores user input)
+            overrides: { material: {}, labor: {}, equipment: {} },
 
-            if (this.items.length === 0) {
-                // start empty — user decides whether to add Sub Project or Work Type
-                this.items = [];
-            } else {
-                const normalize = (arr, parentType = null) => {
+            init() {
+                if (typeof TomSelect === 'undefined') {
+                    console.warn('TomSelect not loaded. Select dropdowns will not be enhanced.');
+                }
+
+                if (this.items.length === 0) {
+                    this.items = [];
+                } else {
+                    const normalize = (arr, parentType = null) => {
+                        arr.forEach(item => {
+                            item.parentType = parentType;
+                            if (item.children && item.children.length) {
+                                normalize(item.children, item.type || null);
+                            }
+                        });
+                    };
+                    normalize(this.items, null);
+                }
+
+                this.$nextTick(() => {
+                    this.initializeAllSelects(document);
+                });
+            },
+
+            // --- NEW METHODS (MOVED INSIDE) ---
+
+            async openPricelistModal() {
+                this.$dispatch('open-modal', 'pricelist-modal');
+                this.isLoading = true;
+                
+                // 1. Collect all AHS IDs from the current items list
+                let ahsIds = [];
+                const collectAhs = (arr) => {
                     arr.forEach(item => {
-                        item.parentType = parentType;
-                        if (item.children && item.children.length) {
-                            normalize(item.children, item.type || null);
-                        }
+                        if (item.unit_rate_analysis_id) ahsIds.push(item.unit_rate_analysis_id);
+                        if (item.children) collectAhs(item.children);
                     });
                 };
-                normalize(this.items, null);
-            }
+                collectAhs(this.items);
+                ahsIds = [...new Set(ahsIds)]; // Unique IDs only
 
-            this.$nextTick(() => {
-                this.initializeAllSelects(document);
-            });
-        },
-
-        /** ------------------------------
-         * ADD FUNCTIONS
-         * ------------------------------ */
-        addRootSection() {
-            this.items.push(this.newItem(true, false, 'sub_project'));
-        },
-
-        addWorkType(workTypeId, targetArray, parentType = null) {
-            if (!workTypeId) return;
-            if (parentType && !['sub_project', null].includes(parentType)) {
-                alert('Work Types can only be added under root or Sub Project.');
-                return;
-            }
-
-            const workType = this.library.workTypes.find(wt => wt.id == workTypeId);
-            if (!workType) return;
-
-            let newWorkTypeItem = this.newItem(true, true, 'work_type');
-            newWorkTypeItem.description = workType.name;
-
-            // Add direct AHS links (if any)
-            if (workType.unit_rate_analyses?.length > 0) {
-                workType.unit_rate_analyses.forEach(ahs => {
-                    let newAhsItem = this.newItem(false, false, 'ahs');
-                    Object.assign(newAhsItem, {
-                        unit_rate_analysis_id: ahs.id,
-                        description: ahs.name,
-                        item_code: ahs.code,
-                        uom: ahs.unit,
-                        unit_price: parseFloat(ahs.total_cost) || 0,
-                        quantity: 1
-                    });
-                    newWorkTypeItem.children.push(newAhsItem);
-                });
-            }
-
-            // Add Work Items
-            if (workType.work_items?.length > 0) {
-                workType.work_items.forEach(workItem => {
-                    let newWorkItem = this.newItem(true, false, 'work_item');
-                    newWorkItem.description = workItem.name;
-
-                    if (workItem.unit_rate_analyses?.length > 0) {
-                        workItem.unit_rate_analyses.forEach(ahs => {
-                            let newAhsItem = this.newItem(false, false, 'ahs');
-                            Object.assign(newAhsItem, {
-                                unit_rate_analysis_id: ahs.id,
-                                description: ahs.name,
-                                item_code: ahs.code,
-                                uom: ahs.unit,
-                                unit_price: parseFloat(ahs.total_cost) || 0,
-                                quantity: 1
-                            });
-                            newWorkItem.children.push(newAhsItem);
-                        });
-                    }
-
-                    newWorkTypeItem.children.push(newWorkItem);
-                });
-            }
-
-            targetArray.push(newWorkTypeItem);
-            this.$nextTick(() => this.initializeAllSelects(this.$el));
-        },
-
-        addWorkItem(parentItem) {
-            if (parentItem.type === 'ahs') {
-                alert('Cannot add Work Item under AHS.');
-                return;
-            }
-
-            if (parentItem.type !== 'work_type') {
-                alert('Work Items can only be added under a Work Type.');
-                return;
-            }
-
-            parentItem.children.push(this.newItem(true, false, 'work_item'));
-            parentItem.open = true;
-        },
-
-        addWorkItemFromLibrary(workItemId, targetArray, parentType = null) {
-            if (!workItemId) return;
-            if (parentType && parentType !== 'work_type') {
-                alert('Work Items can only be added under a Work Type.');
-                return;
-            }
-
-            const workItem = this.library.workItems.find(wi => wi.id == workItemId);
-            if (!workItem) return;
-
-            let newWorkItem = this.newItem(true, false, 'work_item');
-            newWorkItem.description = workItem.name;
-
-            if (workItem.unit_rate_analyses?.length > 0) {
-                workItem.unit_rate_analyses.forEach(ahs => {
-                    let newAhsItem = this.newItem(false, false, 'ahs');
-                    Object.assign(newAhsItem, {
-                        unit_rate_analysis_id: ahs.id,
-                        description: ahs.name,
-                        item_code: ahs.code,
-                        uom: ahs.unit,
-                        unit_price: parseFloat(ahs.total_cost) || 0,
-                        quantity: 1
-                    });
-                    newWorkItem.children.push(newAhsItem);
-                });
-            }
-
-            targetArray.push(newWorkItem);
-            newWorkItem.open = true;
-            this.$nextTick(() => this.initializeAllSelects(this.$el));
-        },
-
-        addAHSItem(parentItem) {
-            if (!['sub_project', 'work_type', 'work_item', null].includes(parentItem.type)) {
-                alert('AHS can only be added under Work Type, Work Item, or top-level Section.');
-                return;
-            }
-            if (!parentItem.children) parentItem.children = [];
-            parentItem.children.push(this.newItem(false, false, 'ahs'));
-            parentItem.open = true;
-            this.$nextTick(() => this.initializeAllSelects(this.$el));
-        },
-
-        /** ------------------------------
-         * REMOVE + TOGGLE
-         * ------------------------------ */
-        removeItem(itemToRemove) {
-            const findAndRemove = (items, targetId) => {
-                for (let i = 0; i < items.length; i++) {
-                    if (items[i].id === targetId) {
-                        this.destroyItemSelects(items[i]);
-                        items.splice(i, 1);
-                        return true;
-                    }
-                    if (items[i].children?.length) {
-                        if (findAndRemove(items[i].children, targetId)) return true;
-                    }
+                if (ahsIds.length === 0) {
+                    this.resources = { materials: [], labors: [], equipments: [] };
+                    this.isLoading = false;
+                    return;
                 }
-                return false;
-            };
-            findAndRemove(this.items, itemToRemove.id);
-        },
 
-        toggleChildren(item) {
-            item.open = !item.open;
-        },
+                // 2. Fetch components from API
+                try {
+                    const response = await axios.post('{{ route('api.quotation.resources') }}', { ahs_ids: ahsIds });
+                    this.resources = response.data;
+                } catch (error) {
+                    console.error(error);
+                    alert('Failed to load project resources.');
+                } finally {
+                    this.isLoading = false;
+                }
+            },
 
-        /** ------------------------------
-         * UTILITIES
-         * ------------------------------ */
-        newItem(isParent = false, isWorkType = false, type = null) {
-            return {
-                id: `temp_${Date.now()}_${Math.random()}`,
-                type: type, // 'sub_project', 'work_type', 'work_item', 'ahs'
-                unit_rate_analysis_id: null,
-                description: '',
-                item_code: '',
-                uom: '',
-                quantity: isParent ? null : 0,
-                unit_price: isParent ? null : 0,
-                children: [],
-                open: true,
-                isParent,
-                isWorkType
-            };
-        },
+            async applyPricelist() {
+                this.isLoading = true;
+                
+                // 1. Collect AHS IDs again
+                let ahsIds = [];
+                const collectAhs = (arr) => {
+                    arr.forEach(item => {
+                        if (item.unit_rate_analysis_id) ahsIds.push(item.unit_rate_analysis_id);
+                        if (item.children) collectAhs(item.children);
+                    });
+                };
+                collectAhs(this.items);
+                ahsIds = [...new Set(ahsIds)];
 
-        linkAHS(item, event) {
-            const selected = event.target.options[event.target.selectedIndex];
-            const id = event.target.value;
-            if (id && selected?.dataset.cost) {
-                item.description = selected.dataset.name;
-                item.item_code = selected.dataset.code;
-                item.uom = selected.dataset.unit;
-                item.unit_price = parseFloat(selected.dataset.cost) || 0;
-                item.unit_rate_analysis_id = id;
-            } else {
-                Object.assign(item, {
+                // 2. Send overrides to API to get recalculated AHS unit prices
+                try {
+                    const response = await axios.post('{{ route('api.quotation.recalculate') }}', {
+                        ahs_ids: ahsIds,
+                        overrides: this.overrides
+                    });
+                    
+                    const newPrices = response.data; // Object: { ahs_id: new_price }
+
+                    // 3. Update the frontend Items recursively
+                    const updateItemPrices = (arr) => {
+                        arr.forEach(item => {
+                            if (item.unit_rate_analysis_id && newPrices[item.unit_rate_analysis_id] !== undefined) {
+                                item.unit_price = parseFloat(newPrices[item.unit_rate_analysis_id]);
+                            }
+                            if (item.children) updateItemPrices(item.children);
+                        });
+                    };
+                    updateItemPrices(this.items);
+
+                    this.$dispatch('close-modal', 'pricelist-modal');
+                    // Notify user visually if you want
+                } catch (error) {
+                    console.error(error);
+                    alert('Failed to recalculate prices.');
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            /** ------------------------------
+             * ADD FUNCTIONS
+             * ------------------------------ */
+            addRootSection() {
+                this.items.push(this.newItem(true, false, 'sub_project'));
+            },
+
+            addWorkType(workTypeId, targetArray, parentType = null) {
+                if (!workTypeId) return;
+                if (parentType && !['sub_project', null].includes(parentType)) {
+                    alert('Work Types can only be added under root or Sub Project.');
+                    return;
+                }
+
+                const workType = this.library.workTypes.find(wt => wt.id == workTypeId);
+                if (!workType) return;
+
+                let newWorkTypeItem = this.newItem(true, true, 'work_type');
+                newWorkTypeItem.description = workType.name;
+
+                // Add direct AHS links (if any)
+                if (workType.unit_rate_analyses?.length > 0) {
+                    workType.unit_rate_analyses.forEach(ahs => {
+                        let newAhsItem = this.newItem(false, false, 'ahs');
+                        Object.assign(newAhsItem, {
+                            unit_rate_analysis_id: ahs.id,
+                            description: ahs.name,
+                            item_code: ahs.code,
+                            uom: ahs.unit,
+                            unit_price: parseFloat(ahs.total_cost) || 0,
+                            quantity: 1
+                        });
+                        newWorkTypeItem.children.push(newAhsItem);
+                    });
+                }
+
+                // Add Work Items
+                if (workType.work_items?.length > 0) {
+                    workType.work_items.forEach(workItem => {
+                        let newWorkItem = this.newItem(true, false, 'work_item');
+                        newWorkItem.description = workItem.name;
+
+                        if (workItem.unit_rate_analyses?.length > 0) {
+                            workItem.unit_rate_analyses.forEach(ahs => {
+                                let newAhsItem = this.newItem(false, false, 'ahs');
+                                Object.assign(newAhsItem, {
+                                    unit_rate_analysis_id: ahs.id,
+                                    description: ahs.name,
+                                    item_code: ahs.code,
+                                    uom: ahs.unit,
+                                    unit_price: parseFloat(ahs.total_cost) || 0,
+                                    quantity: 1
+                                });
+                                newWorkItem.children.push(newAhsItem);
+                            });
+                        }
+
+                        newWorkTypeItem.children.push(newWorkItem);
+                    });
+                }
+
+                targetArray.push(newWorkTypeItem);
+                this.$nextTick(() => this.initializeAllSelects(this.$el));
+            },
+
+            addWorkItem(parentItem) {
+                if (parentItem.type === 'ahs') {
+                    alert('Cannot add Work Item under AHS.');
+                    return;
+                }
+
+                if (parentItem.type !== 'work_type') {
+                    alert('Work Items can only be added under a Work Type.');
+                    return;
+                }
+
+                parentItem.children.push(this.newItem(true, false, 'work_item'));
+                parentItem.open = true;
+            },
+
+            addWorkItemFromLibrary(workItemId, targetArray, parentType = null) {
+                if (!workItemId) return;
+                if (parentType && parentType !== 'work_type') {
+                    alert('Work Items can only be added under a Work Type.');
+                    return;
+                }
+
+                const workItem = this.library.workItems.find(wi => wi.id == workItemId);
+                if (!workItem) return;
+
+                let newWorkItem = this.newItem(true, false, 'work_item');
+                newWorkItem.description = workItem.name;
+
+                if (workItem.unit_rate_analyses?.length > 0) {
+                    workItem.unit_rate_analyses.forEach(ahs => {
+                        let newAhsItem = this.newItem(false, false, 'ahs');
+                        Object.assign(newAhsItem, {
+                            unit_rate_analysis_id: ahs.id,
+                            description: ahs.name,
+                            item_code: ahs.code,
+                            uom: ahs.unit,
+                            unit_price: parseFloat(ahs.total_cost) || 0,
+                            quantity: 1
+                        });
+                        newWorkItem.children.push(newAhsItem);
+                    });
+                }
+
+                targetArray.push(newWorkItem);
+                newWorkItem.open = true;
+                this.$nextTick(() => this.initializeAllSelects(this.$el));
+            },
+
+            addAHSItem(parentItem) {
+                if (!['sub_project', 'work_type', 'work_item', null].includes(parentItem.type)) {
+                    alert('AHS can only be added under Work Type, Work Item, or top-level Section.');
+                    return;
+                }
+                if (!parentItem.children) parentItem.children = [];
+                parentItem.children.push(this.newItem(false, false, 'ahs'));
+                parentItem.open = true;
+                this.$nextTick(() => this.initializeAllSelects(this.$el));
+            },
+
+            /** ------------------------------
+             * REMOVE + TOGGLE
+             * ------------------------------ */
+            removeItem(itemToRemove) {
+                const findAndRemove = (items, targetId) => {
+                    for (let i = 0; i < items.length; i++) {
+                        if (items[i].id === targetId) {
+                            this.destroyItemSelects(items[i]);
+                            items.splice(i, 1);
+                            return true;
+                        }
+                        if (items[i].children?.length) {
+                            if (findAndRemove(items[i].children, targetId)) return true;
+                        }
+                    }
+                    return false;
+                };
+                findAndRemove(this.items, itemToRemove.id);
+            },
+
+            toggleChildren(item) {
+                item.open = !item.open;
+            },
+
+            /** ------------------------------
+             * UTILITIES
+             * ------------------------------ */
+            newItem(isParent = false, isWorkType = false, type = null) {
+                return {
+                    id: `temp_${Date.now()}_${Math.random()}`,
+                    type: type, // 'sub_project', 'work_type', 'work_item', 'ahs'
+                    unit_rate_analysis_id: null,
                     description: '',
                     item_code: '',
                     uom: '',
-                    unit_price: 0,
-                    unit_rate_analysis_id: null
-                });
-            }
-        },
+                    quantity: isParent ? null : 0,
+                    unit_price: isParent ? null : 0,
+                    children: [],
+                    open: true,
+                    isParent,
+                    isWorkType
+                };
+            },
 
-        calculateItemTotal(item) {
-            if (item.isParent) {
-                return (item.children || []).reduce((sum, c) => sum + this.calculateItemTotal(c), 0);
-            }
-            return (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0);
-        },
-
-        get grandTotal() {
-            return this.items.reduce((sum, item) => sum + this.calculateItemTotal(item), 0);
-        },
-
-        formatCurrency(val) {
-            if (isNaN(val)) return 'Rp 0';
-            return parseFloat(val).toLocaleString('id-ID', {
-                style: 'currency',
-                currency: 'IDR',
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 2
-            });
-        },
-
-        /** ------------------------------
-         * SELECT INIT + CLEANUP
-         * ------------------------------ */
-        initializeAllSelects(container) {
-            if (typeof TomSelect === 'undefined') return;
-            container.querySelectorAll('.ahs-select:not(.tomselected)').forEach(el => {
-                this.initializeSelects(el, true);
-            });
-            container.querySelectorAll('select:not(.ahs-select):not(.tomselected)').forEach(el => {
-                this.initializeSelects(el, false);
-            });
-        },
-
-        initializeSelects(el, useTomSelect) {
-            if (typeof TomSelect === 'undefined') return;
-            if (el && !el.tomselect) {
-                if (useTomSelect) {
-                    this.initSelectCounter++;
-                    if (!el.id) el.id = `tomselect-${this.initSelectCounter}`;
-                    new TomSelect(el, { create: false, sortField: { field: "text", direction: "asc" } });
+            linkAHS(item, event) {
+                const selected = event.target.options[event.target.selectedIndex];
+                const id = event.target.value;
+                if (id && selected?.dataset.cost) {
+                    item.description = selected.dataset.name;
+                    item.item_code = selected.dataset.code;
+                    item.uom = selected.dataset.unit;
+                    item.unit_price = parseFloat(selected.dataset.cost) || 0;
+                    item.unit_rate_analysis_id = id;
                 } else {
-                    new TomSelect(el, { create: false });
+                    Object.assign(item, {
+                        description: '',
+                        item_code: '',
+                        uom: '',
+                        unit_price: 0,
+                        unit_rate_analysis_id: null
+                    });
                 }
+            },
+
+            calculateItemTotal(item) {
+                if (item.isParent) {
+                    return (item.children || []).reduce((sum, c) => sum + this.calculateItemTotal(c), 0);
+                }
+                return (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0);
+            },
+
+            get grandTotal() {
+                return this.items.reduce((sum, item) => sum + this.calculateItemTotal(item), 0);
+            },
+
+            formatCurrency(val) {
+                if (isNaN(val)) return 'Rp 0';
+                return parseFloat(val).toLocaleString('id-ID', {
+                    style: 'currency',
+                    currency: 'IDR',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2
+                });
+            },
+
+            /** ------------------------------
+             * SELECT INIT + CLEANUP
+             * ------------------------------ */
+            initializeAllSelects(container) {
+                if (typeof TomSelect === 'undefined') return;
+                container.querySelectorAll('.ahs-select:not(.tomselected)').forEach(el => {
+                    this.initializeSelects(el, true);
+                });
+                container.querySelectorAll('select:not(.ahs-select):not(.tomselected)').forEach(el => {
+                    this.initializeSelects(el, false);
+                });
+            },
+
+            initializeSelects(el, useTomSelect) {
+                if (typeof TomSelect === 'undefined') return;
+                if (el && !el.tomselect) {
+                    if (useTomSelect) {
+                        this.initSelectCounter++;
+                        if (!el.id) el.id = `tomselect-${this.initSelectCounter}`;
+                        new TomSelect(el, { create: false, sortField: { field: "text", direction: "asc" } });
+                    } else {
+                        new TomSelect(el, { create: false });
+                    }
+                }
+            },
+
+            destroySelect(el) {
+                if (el?.tomselect) el.tomselect.destroy();
+            },
+
+            destroyItemSelects(item) {
+                (item.children || []).forEach(child => this.destroyItemSelects(child));
+                const el = document.getElementById(`ahs_id_${item.id}`);
+                if (el) this.destroySelect(el);
             }
-        },
-
-        destroySelect(el) {
-            if (el?.tomselect) el.tomselect.destroy();
-        },
-
-        destroyItemSelects(item) {
-            (item.children || []).forEach(child => this.destroyItemSelects(child));
-            const el = document.getElementById(`ahs_id_${item.id}`);
-            if (el) this.destroySelect(el);
-        }
+        };
     };
-};
-</script>
-@endpush
+    </script>
+    @endpush
 </x-app-layout>

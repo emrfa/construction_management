@@ -25,6 +25,7 @@ use App\Http\Controllers\UserRoleController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\MaterialUsageController;
 
+
 use App\Models\StockTransaction;
 use App\Models\StockLocation;
 
@@ -57,6 +58,9 @@ Route::middleware('auth')->group(function () {
     Route::resource('clients', ClientController::class);
 
     // Quotation Management
+    Route::post('/api/quotation/resources', [\App\Http\Controllers\Api\QuotationCalculatorController::class, 'getProjectResources'])->name('api.quotation.resources');
+    Route::post('/api/quotation/recalculate', [\App\Http\Controllers\Api\QuotationCalculatorController::class, 'recalculateAhsPrices'])->name('api.quotation.recalculate');
+
     Route::resource('clients', ClientController::class);
     Route::resource('quotations', QuotationController::class);
     Route::post('/quotations/{quotation}/status', [QuotationController::class, 'updateStatus'])

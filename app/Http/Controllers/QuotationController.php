@@ -70,14 +70,14 @@ class QuotationController extends Controller
      */
     public function create()
     {
-       // 1. For the Client dropdown
+        // 1. For the Client dropdown
         $clients = Client::orderBy('name')->get();
         
         // 2. For the manual AHS select dropdowns
         $ahsLibrary = UnitRateAnalysis::orderBy('name')->get();
 
         // 3. For the new "Pull Work Type" dropdown (with full recipe)
-       $workTypesLibrary_json = WorkType::with([
+        $workTypesLibrary_json = WorkType::with([
             'workItems.unitRateAnalyses', // For "Group" types
             'unitRateAnalyses'            // For direct "Task" types
         ])->orderBy('name')->get();
@@ -110,42 +110,39 @@ class QuotationController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+   public function store(Request $request)
     {
         // 1. Validate the main quotation fields
-    $validatedData = $request->validate([
-        'client_id' => 'required|exists:clients,id',
-        'project_name' => 'required|string|max:255',
-        'date' => 'required|date',
-        'items_json' => 'required|json', // Validate that it's a valid JSON string
-    ]);
+        $validatedData = $request->validate([
+            'client_id' => 'required|exists:clients,id',
+            'project_name' => 'required|string|max:255',
+            'date' => 'required|date',
+            'items_json' => 'required|json',
+            // [ADDED] Validate overrides_json
+            'overrides_json' => 'nullable|json', 
+        ]);
 
-    
-
-    // vvv ADD THIS LINE vvv
-    // Decode the JSON string into the array our saveItems method expects
-    $itemsArray = json_decode($validatedData['items_json'], true);
+        // Decode the JSON string into the array our saveItems method expects
+        $itemsArray = json_decode($validatedData['items_json'], true);
+        // [ADDED] Decode overrides
+        $overridesInput = json_decode($request->input('overrides_json', '{}'), true);
 
         try {
-        $this->validateHierarchy($itemsArray);
-    } catch (\Exception $e) {
-        return back()->withInput()->withErrors(['items_json' => $e->getMessage()]);
-    }
+            $this->validateHierarchy($itemsArray);
+        } catch (\Exception $e) {
+            return back()->withInput()->withErrors(['items_json' => $e->getMessage()]);
+        }
 
-    $itemsValidator = \Illuminate\Support\Facades\Validator::make(['items' => $itemsArray], [
+        $itemsValidator = \Illuminate\Support\Facades\Validator::make(['items' => $itemsArray], [
             'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:255',
             'items.*.item_code' => 'nullable|string|max:50',
             'items.*.uom' => 'nullable|string|max:50',
-             // Allow quantity/price to be null only if it's a parent item
+            // Allow quantity/price to be null only if it's a parent item
             'items.*.quantity' => ['nullable', 'numeric', 'min:0', function ($attribute, $value, $fail) use ($itemsArray) {
-                // Extract index from attribute like 'items.0.quantity'
                 $index = explode('.', $attribute)[1];
-                // Check if the corresponding item is a parent (has children)
                 if (!isset($itemsArray[$index]['children']) || count($itemsArray[$index]['children']) === 0) {
-                     // If not a parent, quantity is required and must be > 0 if price is > 0 (or adjust logic as needed)
-                     // For simplicity now, just require it for non-parents
-                     if ($value === null || $value === '') $fail($attribute.' is required for line items.');
+                    if ($value === null || $value === '') $fail($attribute.' is required for line items.');
                 }
             }],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0', function ($attribute, $value, $fail) use ($itemsArray) {
@@ -154,55 +151,110 @@ class QuotationController extends Controller
                     if ($value === null || $value === '') $fail($attribute.' is required for line items.');
                 }
             }],
-            // Add validation for the AHS ID
-            'items.*.unit_rate_analysis_id' => 'nullable|exists:unit_rate_analyses,id', // Must exist if provided
-            'items.*.children' => 'nullable|array', // Validate nested children structure if needed
+            'items.*.unit_rate_analysis_id' => 'nullable|exists:unit_rate_analyses,id',
+            'items.*.children' => 'nullable|array',
         ]);
 
         if ($itemsValidator->fails()) {
             return back()->withInput()->withErrors($itemsValidator);
         }
 
-    $grandTotal = 0;
+        $grandTotal = 0;
 
-    try {
-        // 2. Start a database transaction
-        DB::beginTransaction();
+        try {
+            // 2. Start a database transaction
+            DB::beginTransaction();
 
-        // 3. Create the main Quotation
-        // We set total_estimate to 0 for now. We'll update it after saving items.
-        $quotation = Quotation::create([
-            'client_id' => $validatedData['client_id'],
-            'project_name' => $validatedData['project_name'],
-            'date' => $validatedData['date'],
-            'status' => 'draft', // Default status
-            'total_estimate' => 0,
-        ]);
+            // 3. Create the main Quotation
+            $quotation = Quotation::create([
+                'client_id' => $validatedData['client_id'],
+                'project_name' => $validatedData['project_name'],
+                'date' => $validatedData['date'],
+                'status' => 'draft',
+                'total_estimate' => 0,
+            ]);
 
-        // 4. Call our new recursive function to save items
-        $grandTotal = $this->saveItems($itemsArray, $quotation->id, null);
+            // 4. Call our new recursive function to save items
+            $grandTotal = $this->saveItems($itemsArray, $quotation->id, null);
 
-        // 5. Now update the quotation's total_estimate
-        $quotation->disableLogging();
-        $quotation->total_estimate = $grandTotal;
-        $quotation->save();
-        $quotation->enableLogging();
+            // 5. Now update the quotation's total_estimate
+            $quotation->disableLogging();
+            $quotation->total_estimate = $grandTotal;
+            $quotation->save();
 
-        // 6. Commit the transaction
-        DB::commit();
+            // [ADDED] === SAVE OVERRIDES ===
+            
+            // 1. Delete existing (not needed for create, but good practice)
+            DB::table('quotation_material_overrides')->where('quotation_id', $quotation->id)->delete();
+            DB::table('quotation_labor_overrides')->where('quotation_id', $quotation->id)->delete();
+            DB::table('quotation_equipment_overrides')->where('quotation_id', $quotation->id)->delete();
 
-    } catch (\Exception $e) {
-        // 7. If anything went wrong, roll back
-        DB::rollBack();
-        if (isset($quotation)) {
+            // 2. Save Materials
+            if (!empty($overridesInput['material'])) {
+                $inserts = [];
+                foreach ($overridesInput['material'] as $id => $price) {
+                    // Only save if price is valid
+                    if(is_numeric($price)) {
+                        $inserts[] = [
+                            'quotation_id' => $quotation->id, 
+                            'inventory_item_id' => $id, 
+                            'override_price' => $price,
+                            'created_at' => now(), 'updated_at' => now()
+                        ];
+                    }
+                }
+                if(!empty($inserts)) DB::table('quotation_material_overrides')->insert($inserts);
+            }
+
+            // 3. Save Labor
+            if (!empty($overridesInput['labor'])) {
+                $inserts = [];
+                foreach ($overridesInput['labor'] as $id => $price) {
+                    if(is_numeric($price)) {
+                        $inserts[] = [
+                            'quotation_id' => $quotation->id, 
+                            'labor_rate_id' => $id, 
+                            'override_price' => $price,
+                            'created_at' => now(), 'updated_at' => now()
+                        ];
+                    }
+                }
+                if(!empty($inserts)) DB::table('quotation_labor_overrides')->insert($inserts);
+            }
+
+            // 4. Save Equipment
+            if (!empty($overridesInput['equipment'])) {
+                $inserts = [];
+                foreach ($overridesInput['equipment'] as $id => $price) {
+                     if(is_numeric($price)) {
+                        $inserts[] = [
+                            'quotation_id' => $quotation->id, 
+                            'equipment_id' => $id, 
+                            'override_price' => $price,
+                            'created_at' => now(), 'updated_at' => now()
+                        ];
+                     }
+                }
+                if(!empty($inserts)) DB::table('quotation_equipment_overrides')->insert($inserts);
+            }
+            // [END ADDED]
+
+            $quotation->enableLogging();
+
+            // 6. Commit the transaction
+            DB::commit();
+
+        } catch (\Exception $e) {
+            // 7. If anything went wrong, roll back
+            DB::rollBack();
+            if (isset($quotation)) {
                 $quotation->enableLogging();
             }
-        // Optional: return with a specific error message
-        return back()->withInput()->withErrors('Error saving quotation: ' . $e->getMessage());
-    }
+            return back()->withInput()->withErrors('Error saving quotation: ' . $e->getMessage());
+        }
 
-    // 8. Redirect to the list page
-    return redirect()->route('quotations.show', $quotation)->with('success', 'Quotation created successfully.');
+        // 8. Redirect to the list page
+        return redirect()->route('quotations.show', $quotation)->with('success', 'Quotation created successfully.');
     }
 
     private function validateHierarchy(array $items, ?string $parentType = null)
@@ -252,79 +304,67 @@ class QuotationController extends Controller
  * A private helper function to recursively save items.
  */
 private function saveItems(array $items, int $quotationId, ?int $parentId): float
-    {
-        $total = 0;
-        $sortOrder = 0;
+{
+    $total = 0;
+    $sortOrder = 0;
 
-        foreach ($items as $itemData) {
-            // Check if essential data is present, skip if not (e.g., empty rows from Alpine)
-            if (empty($itemData['description'])) {
-                continue;
+    foreach ($items as $itemData) {
+
+        if (empty($itemData['description'])) continue;
+
+        // Determine parent
+        $isParent = !empty($itemData['children']);
+
+        // === FIX HERE: If item uses AHS, override unit price ===
+        if (!empty($itemData['unit_rate_analysis_id'])) {
+            $ahs = UnitRateAnalysis::find($itemData['unit_rate_analysis_id']);
+            if ($ahs) {
+                $itemData['unit_price'] = $ahs->total_cost;  // override
+                $itemData['uom']        = $ahs->unit;        // ensure UOM correct
             }
-
-            // Determine if it's a parent based on children existing in the data
-            $isParent = !empty($itemData['children']);
-
-            // Calculate subtotal for this item if it's NOT a parent
-            $itemSubtotal = 0;
-            if (!$isParent) {
-                $quantity = $itemData['quantity'] ?? 0;
-                $unit_price = $itemData['unit_price'] ?? 0;
-                $itemSubtotal = $quantity * $unit_price;
-            }
-
-            // Create the QuotationItem
-            $item = QuotationItem::create([
-                'quotation_id' => $quotationId,
-                'parent_id' => $parentId,
-                // Add the AHS ID (use null if not set or empty)
-                'unit_rate_analysis_id' => $itemData['unit_rate_analysis_id'] ?? null,
-                'description' => $itemData['description'],
-                'item_code' => $itemData['item_code'] ?? null,
-                'uom' => $itemData['uom'] ?? null,
-                // Use null for quantity/price if it's a parent
-                'quantity' => $isParent ? null : ($itemData['quantity'] ?? 0),
-                'unit_price' => $isParent ? null : ($itemData['unit_price'] ?? 0),
-                'subtotal' => $itemSubtotal, // Calculated only for line items initially
-                'sort_order' => $sortOrder++,
-            ]);
-
-            // If this item has children, save them recursively
-            $childrenTotal = 0;
-            if ($isParent) {
-                $childrenTotal = $this->saveItems($itemData['children'], $quotationId, $item->id);
-            }
-
-            // If an item has children, its subtotal is the sum of its children.
-            // Update the item's subtotal after children are processed.
-            if ($childrenTotal > 0) {
-                $item->subtotal = $childrenTotal;
-                $item->save(); // Save the updated subtotal for the parent
-                $total += $childrenTotal; // Add children's total to the current level's total
-            } elseif (!$isParent) {
-                // Only add line item subtotals directly
-                $total += $itemSubtotal;
-            }
-            // Parent items without children contribute 0 to the total directly
         }
 
-        return $total;
+        // Calculate subtotal for leaf items
+        $itemSubtotal = 0;
+        if (!$isParent) {
+            $quantity = $itemData['quantity'] ?? 0;
+            $unit_price = $itemData['unit_price'] ?? 0;
+            $itemSubtotal = $quantity * $unit_price;
+        }
+
+        // Save item
+        $item = QuotationItem::create([
+            'quotation_id' => $quotationId,
+            'parent_id'    => $parentId,
+            'unit_rate_analysis_id' => $itemData['unit_rate_analysis_id'] ?? null,
+            'description'  => $itemData['description'],
+            'item_code'    => $itemData['item_code'] ?? null,
+            'uom'          => $itemData['uom'] ?? null,
+            'quantity'     => $isParent ? null : ($itemData['quantity'] ?? 0),
+            'unit_price'   => $isParent ? null : ($itemData['unit_price'] ?? 0),
+            'subtotal'     => $itemSubtotal,
+            'sort_order'   => $sortOrder++,
+        ]);
+
+        // Recurse children
+        $childrenTotal = 0;
+        if ($isParent) {
+            $childrenTotal = $this->saveItems($itemData['children'], $quotationId, $item->id);
+        }
+
+        // Roll up totals
+        if ($childrenTotal > 0) {
+            $item->subtotal = $childrenTotal;
+            $item->save();
+            $total += $childrenTotal;
+        } else if (!$isParent) {
+            $total += $itemSubtotal;
+        }
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Quotation $quotation)
-    {
-        $quotation->load([
-        'client', 
-        'items.children', 
-        'activities' => fn($query) => $query->latest(), 
-        'activities.causer'
-    ]);
+    return $total;
+}
 
-        return view('quotations.show', compact('quotation'));
-    }
 
     /**
      * Show the form for editing the specified resource.
@@ -334,8 +374,6 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
         // 1. Get all clients for the dropdown
         $clients = Client::orderBy('name')->get();
         
-        // --- THIS IS THE NEW LOGIC (COPIED FROM 'create') ---
-
         // 2. For the manual AHS select dropdowns
         $ahsLibrary = UnitRateAnalysis::orderBy('name')->get();
 
@@ -348,7 +386,7 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
         // 4. For the "Pull Work Item" dropdown
         $workItemsLibrary_json = \App\Models\WorkItem::with('unitRateAnalyses')->orderBy('name')->get();
 
-        // 5. For the Alpine 'linkAHS' function (THIS FIXES YOUR ERROR)
+        // 5. For the Alpine 'linkAHS' function
         $ahsJsonData = $ahsLibrary->mapWithKeys(fn($ahs) => [$ahs->id => [
             'code' => $ahs->code,
             'name' => $ahs->name,
@@ -356,11 +394,29 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
             'unit_price' => $ahs->total_cost,
         ]])->toJson();
         
-        // --- END OF NEW LOGIC ---
-
         // 6. Get the existing items for this quotation
         $quotation->load('allItems');
         $itemsTree = $this->buildItemTree($quotation->allItems);
+
+        // [ADDED] Load existing overrides
+        // Fetch overrides from the database and structure them for the frontend
+        $materialOverrides = DB::table('quotation_material_overrides')
+            ->where('quotation_id', $quotation->id)
+            ->pluck('override_price', 'inventory_item_id');
+            
+        $laborOverrides = DB::table('quotation_labor_overrides')
+            ->where('quotation_id', $quotation->id)
+            ->pluck('override_price', 'labor_rate_id');
+
+        $equipmentOverrides = DB::table('quotation_equipment_overrides')
+            ->where('quotation_id', $quotation->id)
+            ->pluck('override_price', 'equipment_id');
+
+        $overrides = [
+            'material' => $materialOverrides,
+            'labor' => $laborOverrides,
+            'equipment' => $equipmentOverrides
+        ];
         
         // 7. Pass all data to the view
         return view('quotations.edit', [
@@ -370,7 +426,8 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
             'workTypesLibrary_json' => $workTypesLibrary_json,
             'workItemsLibrary_json' => $workItemsLibrary_json,
             'ahsJsonData' => $ahsJsonData,
-            'oldItemsArray' => $itemsTree, // Pass the items tree
+            'oldItemsArray' => $itemsTree,
+            'existingOverrides' => $overrides, // [ADDED] Pass overrides to view
         ]);
     }
 
@@ -405,72 +462,121 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
      */
     public function update(Request $request, Quotation $quotation)
     {
-        // 1. Validate the main quotation fields
         $validatedData = $request->validate([
             'client_id' => 'required|exists:clients,id',
             'project_name' => 'required|string|max:255',
             'date' => 'required|date',
-            'items_json' => 'required|json', // Validate that it's a valid JSON string
+            'items_json' => 'required|json',
+            // [ADDED] Validate overrides_json
+            'overrides_json' => 'nullable|json',
         ]);
 
-        // Decode the JSON string into an array
         $itemsArray = json_decode($validatedData['items_json'], true);
+        // [ADDED] Decode overrides
+        $overridesInput = json_decode($request->input('overrides_json', '{}'), true);
+
         try {
-                $this->validateHierarchy($itemsArray);
-            } catch (\Exception $e) {
-                return back()->withInput()->withErrors(['items_json' => $e->getMessage()]);
-            }
+            $this->validateHierarchy($itemsArray);
+        } catch (\Exception $e) {
+            return back()->withInput()->withErrors(['items_json' => $e->getMessage()]);
+        }
 
         $itemsValidator = \Illuminate\Support\Facades\Validator::make(['items' => $itemsArray], [
-        'items' => 'required|array|min:1',
-        'items.*.description' => 'required|string|max:255',
-        'items.*.item_code' => 'nullable|string|max:50',
-        'items.*.uom' => 'nullable|string|max:50',
-        'items.*.quantity' => ['nullable', 'numeric', 'min:0', function ($attribute, $value, $fail) use ($itemsArray) { /* ... same logic ... */ }],
-        'items.*.unit_price' => ['nullable', 'numeric', 'min:0', function ($attribute, $value, $fail) use ($itemsArray) { /* ... same logic ... */ }],
-        'items.*.unit_rate_analysis_id' => 'nullable|exists:unit_rate_analyses,id',
-        'items.*.children' => 'nullable|array',
-    ]);
+            'items' => 'required|array|min:1',
+            'items.*.description' => 'required|string|max:255',
+            'items.*.item_code' => 'nullable|string|max:50',
+            'items.*.uom' => 'nullable|string|max:50',
+            'items.*.quantity' => ['nullable', 'numeric', 'min:0', function ($attribute, $value, $fail) use ($itemsArray) { /* ... same logic ... */ }],
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0', function ($attribute, $value, $fail) use ($itemsArray) { /* ... same logic ... */ }],
+            'items.*.unit_rate_analysis_id' => 'nullable|exists:unit_rate_analyses,id',
+            'items.*.children' => 'nullable|array',
+        ]);
 
-    if ($itemsValidator->fails()) {
-        return back()->withInput()->withErrors($itemsValidator);
-    }
-
+        if ($itemsValidator->fails()) {
+            return back()->withInput()->withErrors($itemsValidator);
+        }
 
         $grandTotal = 0;
 
         try {
-            // 2. Start a database transaction
             DB::beginTransaction();
 
-            // 3. Update the main Quotation details
             $quotation->update([
                 'client_id' => $validatedData['client_id'],
                 'project_name' => $validatedData['project_name'],
                 'date' => $validatedData['date'],
             ]);
 
-            // 4. THIS IS THE KEY: Delete all old items
-            // We use allItems() to ensure we get *all* items, not just root ones.
             $quotation->allItems()->delete(); 
 
-            // 5. Call our existing recursive function to save the new items
             $grandTotal = $this->saveItems($itemsArray, $quotation->id, null);
 
-            // 6. Now update the quotation's total_estimate
             $quotation->total_estimate = $grandTotal;
             $quotation->save();
 
-            // 7. Commit the transaction
+            // [ADDED] === SAVE OVERRIDES ===
+            
+            // 1. Clear old overrides
+            DB::table('quotation_material_overrides')->where('quotation_id', $quotation->id)->delete();
+            DB::table('quotation_labor_overrides')->where('quotation_id', $quotation->id)->delete();
+            DB::table('quotation_equipment_overrides')->where('quotation_id', $quotation->id)->delete();
+
+            // 2. Save Materials
+            if (!empty($overridesInput['material'])) {
+                $inserts = [];
+                foreach ($overridesInput['material'] as $id => $price) {
+                    if(is_numeric($price)) {
+                        $inserts[] = [
+                            'quotation_id' => $quotation->id, 
+                            'inventory_item_id' => $id, 
+                            'override_price' => $price,
+                            'created_at' => now(), 'updated_at' => now()
+                        ];
+                    }
+                }
+                if(!empty($inserts)) DB::table('quotation_material_overrides')->insert($inserts);
+            }
+
+            // 3. Save Labor
+            if (!empty($overridesInput['labor'])) {
+                $inserts = [];
+                foreach ($overridesInput['labor'] as $id => $price) {
+                    if(is_numeric($price)) {
+                        $inserts[] = [
+                            'quotation_id' => $quotation->id, 
+                            'labor_rate_id' => $id, 
+                            'override_price' => $price,
+                            'created_at' => now(), 'updated_at' => now()
+                        ];
+                    }
+                }
+                if(!empty($inserts)) DB::table('quotation_labor_overrides')->insert($inserts);
+            }
+
+            // 4. Save Equipment
+            if (!empty($overridesInput['equipment'])) {
+                $inserts = [];
+                foreach ($overridesInput['equipment'] as $id => $price) {
+                    if(is_numeric($price)) {
+                        $inserts[] = [
+                            'quotation_id' => $quotation->id, 
+                            'equipment_id' => $id, 
+                            'override_price' => $price,
+                            'created_at' => now(), 'updated_at' => now()
+                        ];
+                    }
+                }
+                if(!empty($inserts)) DB::table('quotation_equipment_overrides')->insert($inserts);
+            }
+            // [END ADDED]
+
             DB::commit();
 
         } catch (\Exception $e) {
-            // 8. If anything went wrong, roll back
             DB::rollBack();
             return back()->withInput()->withErrors('Error updating quotation: ' . $e->getMessage());
         }
 
-        // 9. Redirect back to the "show" page with a success message
         return redirect()->route('quotations.show', $quotation)
                          ->with('success', 'Quotation updated successfully.');
     }
