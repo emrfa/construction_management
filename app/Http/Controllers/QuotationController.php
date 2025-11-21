@@ -107,6 +107,18 @@ class QuotationController extends Controller
         ]);
     }
 
+    public function show(Quotation $quotation)
+    {
+        $quotation->load([
+        'client', 
+        'items.children', 
+        'activities' => fn($query) => $query->latest(), 
+        'activities.causer'
+    ]);
+
+        return view('quotations.show', compact('quotation'));
+    }
+
     /**
      * Store a newly created resource in storage.
      */
