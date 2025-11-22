@@ -30,12 +30,21 @@
                         $needsFulfillment = $materialRequest->items->some(fn($item) => $item->quantity_requested > $item->quantity_fulfilled);
                     @endphp
                     @if($needsFulfillment)
-                        <form method="POST" action="{{ route('material-requests.createPO', $materialRequest) }}">
-                            @csrf
-                            <button type="submit" class="bg-teal-500 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded text-sm">
-                                + Create Draft PO
-                            </button>
-                        </form>
+                        <div class="flex gap-2">
+                            <form method="POST" action="{{ route('material-requests.createPO', $materialRequest) }}">
+                                @csrf
+                                <button type="submit" class="bg-teal-500 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded text-sm">
+                                    + Create Draft PO
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ route('material-requests.createTransfer', $materialRequest) }}">
+                                @csrf
+                                {{-- We use a link to the create page instead of a direct POST to allow user to edit details first --}}
+                                <a href="{{ route('internal-transfers.create', ['material_request_id' => $materialRequest->id]) }}" class="inline-flex items-center justify-center bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded text-sm h-full">
+                                    + Fulfill via Transfer
+                                </a>
+                            </form>
+                        </div>
                     @else
                         <span class="px-4 py-2 bg-purple-200 text-purple-800 rounded-md font-semibold text-sm">
                             Request Fulfilled
@@ -182,6 +191,60 @@
                                     <tr>
                                         <td colspan="4" class="px-4 py-2 text-center text-gray-500">
                                             No Purchase Orders have been created from this request yet.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <h4 class="font-semibold mb-2 text-gray-800">Associated Internal Transfers</h4>
+                    <div class="overflow-x-auto border rounded">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Transfer #</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Destination</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                @forelse ($materialRequest->internalTransfers as $transfer)
+                                    <tr>
+                                        <td class="px-4 py-2 whitespace-nowrap">
+                                            <a href="{{ route('internal-transfers.show', $transfer) }}" class="text-indigo-600 hover:text-indigo-900 font-medium">
+                                                {{ $transfer->transfer_number }}
+                                            </a>
+                                        </td>
+                                        <td class="px-4 py-2 whitespace-nowrap">
+                                            {{ $transfer->sourceLocation->name ?? 'N/A' }}
+                                        </td>
+                                        <td class="px-4 py-2 whitespace-nowrap">
+                                            {{ $transfer->destinationLocation->name ?? 'N/A' }}
+                                        </td>
+                                        <td class="px-4 py-2 whitespace-nowrap">
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                                @switch($transfer->status)
+                                                    @case('draft') bg-gray-200 text-gray-800 @break
+                                                    @case('processing') bg-blue-200 text-blue-800 @break
+                                                    @case('completed') bg-green-200 text-green-800 @break
+                                                    @case('cancelled') bg-red-200 text-red-800 @break
+                                                @endswitch">
+                                                {{ ucfirst($transfer->status) }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
+                                            <a href="{{ route('internal-transfers.show', $transfer) }}" class="text-indigo-600 hover:text-indigo-900">View</a>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="px-4 py-2 text-center text-gray-500">
+                                            No Internal Transfers have been created from this request yet.
                                         </td>
                                     </tr>
                                 @endforelse

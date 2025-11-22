@@ -311,6 +311,11 @@
                                         <div class="{{ $dotClass }} {{ request()->routeIs('stock-adjustments.*') ? $activeDot : $inactiveDot }}"></div>
                                         {{ __('Stock Adjustments') }}
                                     </a>
+
+                                    <a href="{{ route('internal-transfers.index') }}" class="{{ $baseClasses }} {{ request()->routeIs('internal-transfers.*') ? $activeClasses : $inactiveClasses }}" x-show="hasMatch(['{{ addslashes(__('Internal Transfers')) }}'])">
+                                        <div class="{{ $dotClass }} {{ request()->routeIs('internal-transfers.*') ? $activeDot : $inactiveDot }}"></div>
+                                        {{ __('Internal Transfers') }}
+                                    </a>
                                     
                                     <a href="{{ route('stock-overview.index') }}" class="{{ $baseClasses }} {{ request()->routeIs('stock-overview.*') ? $activeClasses : $inactiveClasses }}" x-show="hasMatch(['{{ addslashes(__('Stock Overview')) }}'])">
                                         <div class="{{ $dotClass }} {{ request()->routeIs('stock-overview.*') ? $activeDot : $inactiveDot }}"></div>

@@ -22,8 +22,15 @@ class GoodsReceiptController extends Controller
 
     public function index(Request $request)
     {
+        $user = Auth::user();
         // Start query
         $query = GoodsReceipt::with('supplier', 'purchaseOrder', 'project', 'location')->latest();
+        
+        // [PERMISSION] Filter by user's location access
+        if (!$user->hasRole('admin')) {
+            $userLocationIds = $user->stockLocations->pluck('id');
+            $query->whereIn('stock_location_id', $userLocationIds);
+        }
         
         // **NEW**: Apply search logic
         $query->when($request->search, function ($q, $search) {
@@ -48,16 +55,24 @@ class GoodsReceiptController extends Controller
      */
     public function create(Request $request)
     {
+        $user = Auth::user();
         $suppliers = Supplier::orderBy('name')->get();
         $projects = Project::orderBy('project_code')->get();
         $inventoryItems = InventoryItem::orderBy('item_name')->get();
-        // Fetch all active locations
-        $locations = StockLocation::where('is_active', true)->orderBy('name')->get();
+        
+        // Fetch active locations filtered by permission
+        if ($user->hasRole('admin')) {
+            $locations = StockLocation::where('is_active', true)->orderBy('name')->get();
+        } else {
+            $locations = $user->stockLocations()->where('is_active', true)->orderBy('name')->get();
+        }
 
         return view('goods-receipts.create', compact(
             'suppliers', 'projects', 'inventoryItems', 'locations'
         ));
     }
+
+
 
     /**
      * UPDATED: store
@@ -113,12 +128,32 @@ class GoodsReceiptController extends Controller
 
                 StockTransaction::create([
                     'inventory_item_id' => $grnItem->inventory_item_id,
-                    'stock_location_id' => $goodsReceipt->stock_location_id, // <-- Changed
+                    'stock_location_id' => $goodsReceipt->stock_location_id,
                     'quantity' => $grnItem->quantity_received,
                     'unit_cost' => $grnItem->unit_cost,
                     'sourceable_id' => $goodsReceipt->id,
                     'sourceable_type' => GoodsReceipt::class,
                 ]);
+
+                // [NEW] Update Stock Balance (WAC)
+                $balance = \App\Models\StockBalance::firstOrNew([
+                    'inventory_item_id' => $grnItem->inventory_item_id,
+                    'stock_location_id' => $goodsReceipt->stock_location_id,
+                ]);
+
+                $currentQty = $balance->quantity ?? 0;
+                $currentAvg = $balance->average_unit_cost ?? 0;
+                $newQty = $grnItem->quantity_received;
+                $newCost = $grnItem->unit_cost;
+
+                $totalValue = ($currentQty * $currentAvg) + ($newQty * $newCost);
+                $totalQty = $currentQty + $newQty;
+                
+                $balance->quantity = $totalQty;
+                if ($totalQty > 0) {
+                    $balance->average_unit_cost = $totalValue / $totalQty;
+                }
+                $balance->save();
             }
 
             DB::commit();
@@ -268,14 +303,35 @@ class GoodsReceiptController extends Controller
                 $grnItem->update(['quantity_received' => $quantityReceivedNow]);
 
                 if ($quantityReceivedNow > 0) {
-                    StockTransaction::create([
+                    $transaction = StockTransaction::create([
                         'inventory_item_id' => $grnItem->inventory_item_id,
-                        'stock_location_id' => $goodsReceipt->stock_location_id, // <-- Changed
+                        'stock_location_id' => $goodsReceipt->stock_location_id,
                         'quantity' => $quantityReceivedNow,
                         'unit_cost' => $grnItem->unit_cost,
                         'sourceable_id' => $goodsReceipt->id,
                         'sourceable_type' => GoodsReceipt::class,
                     ]);
+
+                    // [NEW] Update Stock Balance (WAC)
+                    $balance = \App\Models\StockBalance::firstOrNew([
+                        'inventory_item_id' => $grnItem->inventory_item_id,
+                        'stock_location_id' => $goodsReceipt->stock_location_id,
+                    ]);
+
+                    $currentQty = $balance->quantity ?? 0;
+                    $currentAvg = $balance->average_unit_cost ?? 0;
+                    $newQty = $quantityReceivedNow;
+                    $newCost = $grnItem->unit_cost;
+
+                    $totalValue = ($currentQty * $currentAvg) + ($newQty * $newCost);
+                    $totalQty = $currentQty + $newQty;
+                    
+                    $balance->quantity = $totalQty;
+                    if ($totalQty > 0) {
+                        $balance->average_unit_cost = $totalValue / $totalQty;
+                    }
+                    $balance->last_transaction_id = $transaction->id;
+                    $balance->save();
 
                     $poItem = PurchaseOrderItem::find($grnItem->purchase_order_item_id);
                     if ($poItem) {

@@ -69,7 +69,33 @@
                                     <p>No roles found.</p>
                                 @endforelse
                             </div>
+                            </div>
                         </div>
+
+                        <div class="mt-6 border-t pt-6">
+                            <label class="block font-medium text-lg text-gray-700 mb-4">Assigned Stock Locations</label>
+                            
+                            <div class="max-w-xl">
+                                <select id="stock_locations" name="stock_locations[]" multiple placeholder="Select locations..." autocomplete="off">
+                                    @foreach($stockLocations as $location)
+                                        <option value="{{ $location->id }}" {{ in_array($location->id, $userLocationIds) ? 'selected' : '' }}>
+                                            {{ $location->name }} ({{ $location->code }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="text-sm text-gray-500 mt-2">Users can only create transfers FROM these locations.</p>
+                            </div>
+                        </div>
+
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                new TomSelect('#stock_locations', {
+                                    plugins: ['remove_button'],
+                                    create: false,
+                                    sortField: { field: "text", direction: "asc" }
+                                });
+                            });
+                        </script>
 
                         <div class="flex items-center justify-end mt-6 border-t pt-4">
                             <a href="{{ route('users.index') }}" class="text-sm text-gray-600 hover:text-gray-900 mr-4">

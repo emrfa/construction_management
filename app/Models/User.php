@@ -62,4 +62,15 @@ class User extends Authenticatable
     {
         return $this->hasMany(MaterialRequest::class, 'approved_by_user_id');
     }
+
+    public function stockLocations()
+    {
+        return $this->belongsToMany(StockLocation::class, 'stock_location_user');
+    }
+
+    public function hasAccessToLocation($locationId)
+    {
+        // Admins might have global access, but for now strict check
+        return $this->stockLocations()->where('stock_location_id', $locationId)->exists();
+    }
 }

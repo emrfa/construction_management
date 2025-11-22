@@ -100,13 +100,19 @@ class ProgressUpdateController extends Controller
                 $inventoryItemId = $material['id'];
                 $quantityUsed = $material['quantity'];
 
-                // 3. Get cost from the project-specific location
-                $costSourceTransaction = StockTransaction::where('inventory_item_id', $inventoryItemId)
-                    ->where('stock_location_id', $locationId) // <-- Use fetched ID
-                    ->where('quantity', '>', 0)
-                    ->avg('unit_cost');
+                // 3. Get cost from StockBalance (WAC)
+                $balance = \App\Models\StockBalance::where('inventory_item_id', $inventoryItemId)
+                    ->where('stock_location_id', $locationId)
+                    ->first();
 
-                $unitCost = $costSourceTransaction ?? 0;
+                $currentQty = $balance ? $balance->quantity : 0;
+                
+                // [VALIDATION] Prevent negative stock
+                if ($currentQty < $quantityUsed) {
+                     throw new \Exception("Insufficient stock for item ID $inventoryItemId at this location. Available: $currentQty, Required: $quantityUsed");
+                }
+
+                $unitCost = $balance ? $balance->average_unit_cost : 0;
 
                 MaterialUsage::create([
                     'progress_update_id' => $progressUpdate->id,
@@ -116,14 +122,22 @@ class ProgressUpdateController extends Controller
                 ]);
 
                 // 4. Create the negative transaction from the project-specific location
-                StockTransaction::create([
+                // 4. Create the negative transaction
+                $transaction = StockTransaction::create([
                     'inventory_item_id' => $inventoryItemId,
-                    'stock_location_id' => $locationId, // <-- Use fetched ID
+                    'stock_location_id' => $locationId,
                     'quantity' => -$quantityUsed,
                     'unit_cost' => $unitCost,
                     'sourceable_type' => ProgressUpdate::class,
                     'sourceable_id' => $progressUpdate->id,
                 ]);
+
+                // [NEW] Update Stock Balance (Decrease Qty, Keep WAC)
+                if ($balance) {
+                    $balance->quantity -= $quantityUsed;
+                    $balance->last_transaction_id = $transaction->id;
+                    $balance->save();
+                }
             }
 
             // (Labor and Equipment logic is unchanged)

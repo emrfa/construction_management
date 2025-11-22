@@ -181,7 +181,9 @@ class MaterialRequestController extends Controller
             'approver',          // User who approved
             'items.inventoryItem', // Material details for each item
             'items.quotationItem', // WBS item linked
-            'purchaseOrders.supplier'
+            'purchaseOrders.supplier',
+            'internalTransfers.sourceLocation', // Load transfers and their source
+            'internalTransfers.destinationLocation',
         ]);
 
         return view('material-requests.show', compact('materialRequest'));
@@ -429,4 +431,61 @@ public function createPurchaseOrder(MaterialRequest $materialRequest)
                         ->with('success', 'Draft Purchase Order created. Please select supplier and confirm details.');
     }
 
+    public function createTransfer(Request $request, MaterialRequest $materialRequest)
+    {
+        $validated = $request->validate([
+            'source_location_id' => 'required|exists:stock_locations,id',
+        ]);
+
+        // Check if user has access to source
+        $user = Auth::user();
+        if (!$user->hasRole('admin') && !$user->hasAccessToLocation($validated['source_location_id'])) {
+            return back()->with('error', 'You do not have permission to transfer from the selected source location.');
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // We need a destination. Does the Project have a location?
+            // StockLocation has project_id.
+            $destLocation = \App\Models\StockLocation::where('project_id', $materialRequest->project_id)->first();
+            
+            if (!$destLocation) {
+                throw new \Exception("No Stock Location found for this Project. Please create one first.");
+            }
+
+            $transfer = \App\Models\InternalTransfer::create([
+                'transfer_number' => 'TRF-' . strtoupper(uniqid()),
+                'source_location_id' => $validated['source_location_id'],
+                'destination_location_id' => $destLocation->id,
+                'status' => 'draft',
+                'created_by_user_id' => Auth::id(),
+                'material_request_id' => $materialRequest->id,
+                'notes' => 'Generated from Material Request ' . $materialRequest->request_number,
+            ]);
+
+            foreach ($materialRequest->items as $mrItem) {
+                // Map MR Item (Quotation Item) to Inventory Item
+                $inventoryItemId = $mrItem->quotationItem->inventory_item_id ?? null;
+                
+                if ($inventoryItemId) {
+                    \App\Models\InternalTransferItem::create([
+                        'internal_transfer_id' => $transfer->id,
+                        'inventory_item_id' => $inventoryItemId,
+                        'quantity_requested' => $mrItem->quantity, // Request full quantity initially
+                        'quantity_shipped' => 0,
+                    ]);
+                }
+            }
+
+            DB::commit();
+            
+            return redirect()->route('internal-transfers.show', $transfer)
+                             ->with('success', 'Draft Transfer created from Material Request.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Error creating transfer: ' . $e->getMessage());
+        }
+    }
 }

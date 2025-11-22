@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 
+use App\Models\StockLocation;
+
 class UserRoleController extends Controller
 {
     /**
@@ -78,8 +80,12 @@ class UserRoleController extends Controller
     {
         $roles = Role::all();
         $userRoles = $user->roles->pluck('name')->all();
+        
+        // Fetch Active Stock Locations
+        $stockLocations = StockLocation::where('is_active', true)->orderBy('name')->get();
+        $userLocationIds = $user->stockLocations->pluck('id')->all();
 
-        return view('users.edit', compact('user', 'roles', 'userRoles'));
+        return view('users.edit', compact('user', 'roles', 'userRoles', 'stockLocations', 'userLocationIds'));
     }
 
     /**
@@ -91,7 +97,9 @@ class UserRoleController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class. ',email,' . $user->id],
             'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
-            'roles' => 'nullable|array'
+            'roles' => 'nullable|array',
+            'stock_locations' => 'nullable|array', // Validate stock locations
+            'stock_locations.*' => 'exists:stock_locations,id',
         ]);
 
         DB::beginTransaction();
@@ -108,6 +116,9 @@ class UserRoleController extends Controller
 
             // Sync roles
             $user->syncRoles($validated['roles'] ?? []);
+
+            // Sync Stock Locations
+            $user->stockLocations()->sync($validated['stock_locations'] ?? []);
             
             DB::commit();
         } catch (\Exception $e) {

@@ -18,8 +18,15 @@ class StockAdjustmentController extends Controller
      */
     public function index(Request $request)
     {
+        $user = Auth::user();
         // Start query
         $query = StockAdjustment::with('location', 'user')->latest();
+        
+        // [PERMISSION] Filter by user's location access
+        if (!$user->hasRole('admin')) {
+            $userLocationIds = $user->stockLocations->pluck('id');
+            $query->whereIn('stock_location_id', $userLocationIds);
+        }
         
         // **NEW**: Apply search logic
         $query->when($request->search, function ($q, $search) {
@@ -44,12 +51,19 @@ class StockAdjustmentController extends Controller
      */
     public function create()
     {
-        $locations = StockLocation::where('is_active', true)->orderBy('name')->get();
+        $user = Auth::user();
+        // Fetch active locations filtered by permission
+        if ($user->hasRole('admin')) {
+            $locations = StockLocation::where('is_active', true)->orderBy('name')->get();
+        } else {
+            $locations = $user->stockLocations()->where('is_active', true)->orderBy('name')->get();
+        }
         
         // We will fetch items dynamically via an API for performance
         
         return view('stock-adjustments.create', compact('locations'));
     }
+
 
     /**
      * Store a newly created resource in storage.
@@ -125,7 +139,8 @@ class StockAdjustmentController extends Controller
                 ]);
 
                 // 4. Create the final Stock Transaction
-                StockTransaction::create([
+                // 4. Create the final Stock Transaction
+                $transaction = StockTransaction::create([
                     'inventory_item_id' => $itemId,
                     'stock_location_id' => $locationId,
                     'quantity' => $adjustmentQty,
@@ -133,6 +148,35 @@ class StockAdjustmentController extends Controller
                     'sourceable_id' => $adjustment->id,
                     'sourceable_type' => StockAdjustment::class,
                 ]);
+
+                // [NEW] Update Stock Balance
+                $balance = \App\Models\StockBalance::firstOrNew([
+                    'inventory_item_id' => $itemId,
+                    'stock_location_id' => $locationId,
+                ]);
+
+                $currentQtyBal = $balance->quantity ?? 0;
+                $currentAvgBal = $balance->average_unit_cost ?? 0;
+
+                if ($adjustmentQty > 0) {
+                    // GAIN: Treat as incoming stock (recalculate WAC)
+                    // Note: We are using $avgCost (which was derived from history or base price) as the "incoming cost"
+                    // Ideally, the user should specify the cost for positive adjustments, but for now we stick to the logic of "using system cost"
+                    
+                    $totalValue = ($currentQtyBal * $currentAvgBal) + ($adjustmentQty * $avgCost);
+                    $totalQty = $currentQtyBal + $adjustmentQty;
+                    
+                    $balance->quantity = $totalQty;
+                    if ($totalQty > 0) {
+                        $balance->average_unit_cost = $totalValue / $totalQty;
+                    }
+                } else {
+                    // LOSS: Treat as usage (keep WAC, reduce Qty)
+                    $balance->quantity += $adjustmentQty; // adjustmentQty is negative
+                }
+                
+                $balance->last_transaction_id = $transaction->id;
+                $balance->save();
             }
 
             DB::commit();

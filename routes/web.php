@@ -132,6 +132,19 @@ Route::middleware('auth')->group(function () {
     Route::resource('stock-adjustments', \App\Http\Controllers\StockAdjustmentController::class)
          ->only(['index', 'create', 'store', 'show']);
 
+    // Internal Transfers
+    Route::resource('internal-transfers', \App\Http\Controllers\InternalTransferController::class);
+
+    // Transfer Shipments
+    Route::resource('transfer-shipments', \App\Http\Controllers\TransferShipmentController::class)->except(['create', 'store']);
+    Route::get('internal-transfers/{internalTransfer}/ship', [\App\Http\Controllers\TransferShipmentController::class, 'create'])->name('transfer-shipments.create');
+    Route::post('internal-transfers/{internalTransfer}/ship', [\App\Http\Controllers\TransferShipmentController::class, 'store'])->name('transfer-shipments.store');
+
+    // Transfer Receipts
+    Route::resource('transfer-receipts', \App\Http\Controllers\TransferReceiptController::class)->except(['create', 'store']);
+    Route::get('transfer-shipments/{transferShipment}/receive', [\App\Http\Controllers\TransferReceiptController::class, 'create'])->name('transfer-receipts.create');
+    Route::post('transfer-shipments/{transferShipment}/receive', [\App\Http\Controllers\TransferReceiptController::class, 'store'])->name('transfer-receipts.store');
+
     // API Route to get stock balances for a location
     Route::get('/web-api/locations/{stockLocation}/stock', function (StockLocation $stockLocation, Request $request) {
         
@@ -200,6 +213,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('material-requests', MaterialRequestController::class);
     Route::post('/material-requests/{materialRequest}/status', [MaterialRequestController::class, 'updateStatus'])->name('material-requests.updateStatus');
     Route::post('/material-requests/{materialRequest}/create-po', [MaterialRequestController::class, 'createPurchaseOrder'])->name('material-requests.createPO');
+    Route::post('/material-requests/{materialRequest}/create-transfer', [MaterialRequestController::class, 'createTransfer'])->name('material-requests.createTransfer');
 
     // Reporting Routes
     Route::get('/reports/material-flow/{project}', [ReportController::class, 'materialFlowReport'])

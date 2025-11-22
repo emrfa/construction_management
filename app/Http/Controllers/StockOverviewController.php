@@ -15,11 +15,19 @@ class StockOverviewController extends Controller
      */
     public function index()
     {
-        $locations = StockLocation::with('project.quotation')
+        $user = \Illuminate\Support\Facades\Auth::user();
+        
+        $query = StockLocation::with('project.quotation')
             ->where('is_active', true)
             ->orderBy('type')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        if (!$user->hasRole('admin')) {
+            $userLocationIds = $user->stockLocations->pluck('id');
+            $query->whereIn('id', $userLocationIds);
+        }
+
+        $locations = $query->get();
             
         return view('stock-overview.index', compact('locations'));
     }
