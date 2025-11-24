@@ -275,20 +275,21 @@ class ReportController extends Controller
                 
                 $taskData = $taskDetails[$task->id]; // Get the item
                 $lastPeriodPlannedPercent = $taskData['total_planned_percent']; // Get last known total %
-                $taskData['weekly_planned'][] = max(0, $currentPeriodPlannedWeight - $lastPeriodPlannedPercent); // Store delta %
+                $taskData['weekly_planned'][] = $currentPeriodPlannedWeight - $lastPeriodPlannedPercent; // Store delta % (Allow negative for replanning)
                 $taskData['total_planned_percent'] = $currentPeriodPlannedWeight; // Update total %
                 
                 // --- Calculate Earned Value (EV) ---
                 $latestUpdate = $task->progressUpdates
                     ->where('date', '<=', $currentDate)
                     ->sortByDesc('date')
+                    ->sortByDesc('id') // Ensure deterministic result for same-day updates
                     ->first();
 
                 $currentPeriodActualPercent = $latestUpdate ? $latestUpdate->percent_complete : 0;
                 $currentPeriodActualWeight = ($currentPeriodActualPercent / 100) * $taskWeight;
 
                 $lastPeriodActualPercent = $taskData['total_actual_percent']; // Get last known total %
-                $taskData['weekly_actual'][] = max(0, $currentPeriodActualWeight - $lastPeriodActualPercent); // Store delta %
+                $taskData['weekly_actual'][] = $currentPeriodActualWeight - $lastPeriodActualPercent; // Store delta % (Allow negative for corrections)
                 $taskData['total_actual_percent'] = $currentPeriodActualWeight; // Update total %
 
                 // --- NEW: Calculate Task-level AC for this period ---
@@ -371,6 +372,7 @@ class ReportController extends Controller
         $reportData = [
             'cost_variance' => $currentEV_Currency - $currentAC_Currency,
             'schedule_variance' => $currentEV_Currency - $currentPV_Currency,
+            'schedule_variance_percent' => $currentEV_Percent - $currentPV_Percent, // NEW: Percentage Variance
             'planned_percent' => $currentPV_Percent,
             'earned_percent' => $currentEV_Percent,
             
@@ -380,6 +382,9 @@ class ReportController extends Controller
                 'planned' => $chartData['pv_currency'],
                 'earned' => $chartData['ev_currency'],
                 'actual' => $chartData['ac_currency'],
+                // NEW: Pass percentage data for dynamic chart
+                'planned_percent' => $chartData['pv_percent'],
+                'earned_percent' => $chartData['ev_percent'],
             ],
             
             // Data for task table headers
