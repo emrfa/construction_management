@@ -90,15 +90,14 @@
             <div class="h-screen bg-slate-50 flex overflow-hidden">
                 
                 {{-- === SIDEBAR === --}}
-                <aside class="w-72 bg-slate-950 text-slate-300 shadow-2xl border-r border-white/5 flex-shrink-0 flex flex-col h-full relative z-20 transition-all duration-300 ease-in-out" 
+                <aside class="w-72 bg-white text-slate-900 border-r border-slate-200 flex-shrink-0 flex flex-col h-full relative z-20 transition-all duration-300 ease-in-out" 
                     x-data="sidebarLogic">
                     
                     {{-- Brand Logo Area --}}
-                    <div class="h-20 flex items-center justify-center border-b border-white/5 bg-slate-950/50 backdrop-blur-sm flex-shrink-0 relative">
-                        <div class="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent"></div>
+                    <div class="h-20 flex items-center justify-center border-b border-slate-200 bg-white flex-shrink-0 relative">
                         <a href="{{ route('dashboard') }}" class="flex items-center gap-3 group">
-                            <div class="filter drop-shadow-[0_0_8px_rgba(99,102,241,0.3)] transition-all duration-500 group-hover:drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]">
-                                <x-application-logo class="block h-10 w-auto fill-current text-white" />
+                            <div class="transition-all duration-500 group-hover:scale-105">
+                                <x-application-logo class="block h-10 w-auto text-indigo-700 fill-current" />
                             </div>
                         </a>
                     </div>
@@ -107,7 +106,7 @@
                     <div class="px-5 py-6 flex-shrink-0">
                         <div class="relative group">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <svg class="h-4 w-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors duration-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="h-4 w-4 text-slate-500 group-focus-within:text-indigo-600 transition-colors duration-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                             </div>
@@ -115,33 +114,33 @@
                                 name="search" 
                                 placeholder="Search..." 
                                 x-model.debounce.300ms="searchTerm"
-                                class="block w-full pl-10 pr-3 py-2 bg-slate-900/50 border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-200 shadow-inner uppercase tracking-wider"
+                                class="block w-full pl-10 pr-3 py-2 bg-slate-100 border border-slate-300 rounded-lg text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all duration-200 shadow-sm uppercase tracking-wider font-semibold"
                             />
                         </div>
                     </div>
                     
                     @php
-                    // Styles
-                    $baseClasses = 'group flex items-center w-full text-left px-4 py-2 text-sm rounded-r-lg transition-all duration-200 relative overflow-hidden mx-0 border-l-[3px] border-transparent';
-                    $activeClasses = 'bg-gradient-to-r from-indigo-500/10 to-transparent border-indigo-500 text-white font-medium shadow-[inset_1px_0_0_rgba(255,255,255,0.05)]';
-                    $inactiveClasses = 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.02]';
-                    $deadLinkClasses = 'text-slate-600 cursor-not-allowed opacity-60 hover:text-slate-500';
+                    // Styles - Light Theme (High Contrast)
+                    $baseClasses = 'group flex items-center w-full text-left px-4 py-2.5 text-sm rounded-lg transition-all duration-200 relative overflow-hidden mx-2 w-[calc(100%-16px)] font-medium';
+                    $activeClasses = 'bg-indigo-50 text-indigo-800 font-bold shadow-sm ring-1 ring-indigo-200';
+                    $inactiveClasses = 'text-slate-700 hover:bg-slate-100 hover:text-slate-950';
+                    $deadLinkClasses = 'text-slate-400 cursor-not-allowed opacity-60 hover:text-slate-500';
                     
-                    $sectionHeaderClass = "w-full flex items-center justify-between px-4 py-3 text-[10px] uppercase font-bold tracking-widest text-slate-500 hover:text-slate-300 transition-colors duration-200 mt-4 mb-1 select-none cursor-pointer";
+                    $sectionHeaderClass = "w-full flex items-center justify-between px-6 py-3 text-[11px] uppercase font-bold tracking-widest text-slate-500 hover:text-slate-800 transition-colors duration-200 mt-4 mb-1 select-none cursor-pointer";
                     
                     $dotClass = "w-1.5 h-1.5 rounded-full mr-3 transition-all duration-300";
-                    $activeDot = "bg-indigo-400 shadow-[0_0_5px_rgba(99,102,241,0.8)]";
-                    $inactiveDot = "bg-slate-700 group-hover:bg-slate-500";
+                    $activeDot = "bg-indigo-600 shadow-[0_0_8px_rgba(79,70,229,0.4)]";
+                    $inactiveDot = "bg-slate-400 group-hover:bg-slate-600";
                     @endphp
                     
                     <div class="flex-1 overflow-y-auto px-0 space-y-1 sidebar-scroll pb-10">
-                        <nav class="pr-3">
+                        <nav class="space-y-0.5">
                             
                             {{-- Section: Dashboard --}}
                             <div x-show="hasMatch(['dashboard'])">
                                 <a href="{{ route('dashboard') }}"
                                 class="{{ $baseClasses }} {{ request()->routeIs('dashboard') ? $activeClasses : $inactiveClasses }} mt-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-3 {{ request()->routeIs('dashboard') ? 'text-indigo-400' : 'text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3 {{ request()->routeIs('dashboard') ? 'text-indigo-700' : 'text-slate-500 group-hover:text-slate-800' }} transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                                     </svg>
                                     <span>Dashboard</span>
@@ -153,7 +152,7 @@
                             <div x-show="hasMatch(['sales', '{{ addslashes(__('Clients')) }}', '{{ addslashes(__('Quotations')) }}'])">
                                 <div @click="openSections.sales = !openSections.sales" class="{{ $sectionHeaderClass }}">
                                     <span>Sales</span>
-                                    <svg class="h-2.5 w-2.5 opacity-50 transition-transform duration-300" :class="{ 'rotate-180': openSections.sales }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
+                                    <svg class="h-3 w-3 opacity-70 transition-transform duration-300 text-slate-600" :class="{ 'rotate-180': openSections.sales }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                                 </div>
                                 
                                 <div x-show="openSections.sales" x-transition class="space-y-0.5">
@@ -178,7 +177,7 @@
                             <div x-show="hasMatch(['projects', '{{ addslashes(__('Project List')) }}', 'Project Tasks', 'Progress Updates'])">
                                 <div @click="openSections.projects = !openSections.projects" class="{{ $sectionHeaderClass }}">
                                     <span>Projects</span>
-                                    <svg class="h-2.5 w-2.5 opacity-50 transition-transform duration-300" :class="{ 'rotate-180': openSections.projects }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
+                                    <svg class="h-3 w-3 opacity-70 transition-transform duration-300 text-slate-600" :class="{ 'rotate-180': openSections.projects }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                                 </div>
                                 <div x-show="openSections.projects" x-transition class="space-y-0.5">
                                     <a href="{{ route('projects.index') }}" class="{{ $baseClasses }} {{ request()->routeIs('projects.*') ? $activeClasses : $inactiveClasses }}" x-show="hasMatch(['{{ addslashes(__('Project List')) }}'])">
@@ -186,11 +185,11 @@
                                         {{ __('Project List') }}
                                     </a>
                                     <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}" x-show="hasMatch(['Project Tasks'])">
-                                        <div class="{{ $dotClass }} bg-slate-800"></div>
+                                        <div class="{{ $dotClass }} bg-slate-300"></div>
                                         Project Tasks (WBS)
                                     </a>
                                     <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}" x-show="hasMatch(['Progress Updates'])">
-                                        <div class="{{ $dotClass }} bg-slate-800"></div>
+                                        <div class="{{ $dotClass }} bg-slate-300"></div>
                                         Progress Updates
                                     </a>
                                 </div>
@@ -202,7 +201,7 @@
                             <div x-show="hasMatch(['procurement', '{{ addslashes(__('Suppliers')) }}', '{{ addslashes(__('Purchase Orders')) }}'])">
                                 <div @click="openSections.procurement = !openSections.procurement" class="{{ $sectionHeaderClass }}">
                                     <span>Procurement</span>
-                                    <svg class="h-2.5 w-2.5 opacity-50 transition-transform duration-300" :class="{ 'rotate-180': openSections.procurement }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
+                                    <svg class="h-3 w-3 opacity-70 transition-transform duration-300 text-slate-600" :class="{ 'rotate-180': openSections.procurement }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                                 </div>
                                 <div x-show="openSections.procurement" x-transition class="space-y-0.5">
                                     @can('manage suppliers')
@@ -226,7 +225,7 @@
                             <div x-show="hasMatch(['work library', '{{ addslashes(__('AHS Library')) }}', '{{ addslashes(__('Work Types')) }}', '{{ addslashes(__('Work Items')) }}'])">
                                 <div @click="openSections.workLibrary = !openSections.workLibrary" class="{{ $sectionHeaderClass }}">
                                     <span>Work Library</span>
-                                    <svg class="h-2.5 w-2.5 opacity-50 transition-transform duration-300" :class="{ 'rotate-180': openSections.workLibrary }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
+                                    <svg class="h-3 w-3 opacity-70 transition-transform duration-300 text-slate-600" :class="{ 'rotate-180': openSections.workLibrary }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                                 </div>
                                 <div x-show="openSections.workLibrary" x-transition class="space-y-0.5">
                                     @can('manage ahs_library')
@@ -256,7 +255,7 @@
                             <div x-show="hasMatch(['inventory', '{{ addslashes(__('Receiving')) }}', '{{ addslashes(__('Item Master')) }}', '{{ addslashes(__('Item Categories')) }}', '{{ addslashes(__('Equipment')) }}', '{{ addslashes(__('Labor Rates')) }}', '{{ addslashes(__('Stock Ledger')) }}', '{{ addslashes(__('Stock Balance')) }}', '{{ addslashes(__('Stock Locations')) }}', '{{ addslashes(__('Stock Adjustments')) }}', '{{ addslashes(__('Stock Overview')) }}', 'Material Usage'])">
                                 <div @click="openSections.inventory = !openSections.inventory" class="{{ $sectionHeaderClass }}">
                                     <span>Inventory</span>
-                                    <svg class="h-2.5 w-2.5 opacity-50 transition-transform duration-300" :class="{ 'rotate-180': openSections.inventory }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
+                                    <svg class="h-3 w-3 opacity-70 transition-transform duration-300 text-slate-600" :class="{ 'rotate-180': openSections.inventory }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                                 </div>
                                 <div x-show="openSections.inventory" x-transition class="space-y-0.5">
                                     @can('manage inventory')
@@ -335,7 +334,7 @@
                             <div x-show="hasMatch(['billing', '{{ addslashes(__('Billings')) }}', '{{ addslashes(__('Invoices')) }}', 'Payments'])">
                                 <div @click="openSections.billing = !openSections.billing" class="{{ $sectionHeaderClass }}">
                                     <span>Billing</span>
-                                    <svg class="h-2.5 w-2.5 opacity-50 transition-transform duration-300" :class="{ 'rotate-180': openSections.billing }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
+                                    <svg class="h-3 w-3 opacity-70 transition-transform duration-300 text-slate-600" :class="{ 'rotate-180': openSections.billing }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                                 </div>
                                 <div x-show="openSections.billing" x-transition class="space-y-0.5">
                                     @can('manage billings')
@@ -352,7 +351,7 @@
                                     @endcan
                                     @can('manage payments')
                                     <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}" x-show="hasMatch(['Payments'])">
-                                        <div class="{{ $dotClass }} bg-slate-800"></div>
+                                        <div class="{{ $dotClass }} bg-slate-300"></div>
                                         Payments
                                     </a>
                                     @endcan
@@ -365,15 +364,15 @@
                             <div x-show="hasMatch(['reports', 'Project Costing', 'Inventory Levels'])">
                                 <div @click="openSections.reports = !openSections.reports" class="{{ $sectionHeaderClass }}">
                                     <span>Reports</span>
-                                    <svg class="h-2.5 w-2.5 opacity-50 transition-transform duration-300" :class="{ 'rotate-180': openSections.reports }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
+                                    <svg class="h-3 w-3 opacity-70 transition-transform duration-300 text-slate-600" :class="{ 'rotate-180': openSections.reports }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                                 </div>
                                 <div x-show="openSections.reports" x-transition class="space-y-0.5">
                                     <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}" x-show="hasMatch(['Project Costing'])">
-                                        <div class="{{ $dotClass }} bg-slate-800"></div>
+                                        <div class="{{ $dotClass }} bg-slate-300"></div>
                                         Project Costing
                                     </a>
                                     <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}" x-show="hasMatch(['Inventory Levels'])">
-                                        <div class="{{ $dotClass }} bg-slate-800"></div>
+                                        <div class="{{ $dotClass }} bg-slate-300"></div>
                                         Inventory Levels
                                     </a>
                                 </div>
@@ -385,7 +384,7 @@
                             <div x-show="hasMatch(['settings', 'Users & Roles', 'Manage Roles', 'Company Details'])">
                                 <div @click="openSections.settings = !openSections.settings" class="{{ $sectionHeaderClass }}">
                                     <span>Settings</span>
-                                    <svg class="h-2.5 w-2.5 opacity-50 transition-transform duration-300" :class="{ 'rotate-180': openSections.settings }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
+                                    <svg class="h-3 w-3 opacity-70 transition-transform duration-300 text-slate-600" :class="{ 'rotate-180': openSections.settings }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                                 </div>
                                 <div x-show="openSections.settings" x-transition class="space-y-0.5">
                                     <a href="{{ route('users.index') }}" class="{{ $baseClasses }} {{ request()->routeIs('users.*') ? $activeClasses : $inactiveClasses }}" x-show="hasMatch(['Users & Roles'])">
@@ -397,7 +396,7 @@
                                         Manage Roles
                                     </a>
                                     <a href="#" class="{{ $baseClasses }} {{ $deadLinkClasses }}" x-show="hasMatch(['Company Details'])">
-                                        <div class="{{ $dotClass }} bg-slate-800"></div>
+                                        <div class="{{ $dotClass }} bg-slate-300"></div>
                                         Company Details
                                     </a>
                                 </div>
@@ -407,20 +406,20 @@
                     </div>
 
                     {{-- User Profile / Footer --}}
-                    <div class="flex-shrink-0 border-t border-white/5 bg-slate-950 p-4">
+                    <div class="flex-shrink-0 border-t border-slate-200 bg-slate-50 p-4">
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="flex items-center w-full group focus:outline-none">
                                 <div class="relative">
-                                    <div class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg group-hover:shadow-indigo-500/50 transition-shadow duration-300">
+                                    <div class="h-9 w-9 rounded-full bg-white border border-slate-300 flex items-center justify-center text-indigo-700 font-bold shadow-sm group-hover:shadow-md transition-all duration-300">
                                         {{ substr(Auth::user()->name, 0, 1) }}
                                     </div>
-                                    <div class="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 border-2 border-slate-900"></div>
+                                    <div class="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-slate-50"></div>
                                 </div>
-                                <div class="ml-3 text-left">
-                                    <p class="text-sm font-medium text-slate-200 group-hover:text-white transition-colors">{{ Auth::user()->name }}</p>
-                                    <p class="text-xs text-slate-500 group-hover:text-slate-400 transition-colors truncate w-32">{{ Auth::user()->email }}</p>
+                                <div class="ml-3 text-left overflow-hidden">
+                                    <p class="text-sm font-bold text-slate-800 group-hover:text-indigo-700 transition-colors truncate">{{ Auth::user()->name }}</p>
+                                    <p class="text-xs text-slate-600 truncate font-medium">{{ Auth::user()->email }}</p>
                                 </div>
-                                <svg class="ml-auto h-4 w-4 text-slate-500 group-hover:text-slate-300 transition-transform duration-200" :class="{ 'rotate-180': open }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg class="ml-auto h-4 w-4 text-slate-500 group-hover:text-slate-800 transition-transform duration-200" :class="{ 'rotate-180': open }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
                                 </svg>
                             </button>
@@ -434,15 +433,15 @@
                                 x-transition:leave="transition ease-in duration-75"
                                 x-transition:leave-start="transform opacity-100 scale-100 translate-y-0"
                                 x-transition:leave-end="transform opacity-0 scale-95 translate-y-2"
-                                class="absolute bottom-full left-0 w-full mb-2 bg-slate-900 border border-slate-800 rounded-lg shadow-2xl overflow-hidden z-50" style="display: none;">
+                                class="absolute bottom-full left-0 w-full mb-2 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden z-50" style="display: none;">
                                 
-                                <a href="{{ route('profile.edit') }}" class="block px-4 py-2.5 text-sm text-slate-300 hover:bg-indigo-600 hover:text-white transition-colors">
+                                <a href="{{ route('profile.edit') }}" class="block px-4 py-2.5 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors font-medium">
                                     Profile Settings
                                 </a>
                                 
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
-                                    <a href="{{ route('logout') }}" class="block px-4 py-2.5 text-sm text-slate-300 hover:bg-red-600 hover:text-white transition-colors"
+                                    <a href="{{ route('logout') }}" class="block px-4 py-2.5 text-sm text-slate-700 hover:bg-red-50 hover:text-red-600 transition-colors font-medium"
                                     onclick="event.preventDefault(); this.closest('form').submit();">
                                         Sign Out
                                     </a>
