@@ -83,8 +83,28 @@
                     </div>
 
                     <div class="mt-8">
-                        <h4 class="text-lg font-semibold text-gray-800 mb-4">Time Schedule & Progress Detail</h4>
-                        <div id="scheduleTableContainer" class="bg-white overflow-hidden shadow-sm sm:rounded-lg border">
+                        <div class="flex justify-between items-center mb-4">
+                            <h4 class="text-lg font-semibold text-gray-800">Time Schedule & Progress Detail</h4>
+                            <button onclick="downloadSchedulePDF()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded inline-flex items-center text-sm">
+                                <svg class="fill-current w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M13 8V2H7v6H2l8 8 8-8h-5zM0 18h20v2H0v-2z"/></svg>
+                                <span>Download Schedule</span>
+                            </button>
+                        </div>
+                        <div id="pdf-export-container">
+                            {{-- PDF Header (Hidden on Screen) --}}
+                            <div id="pdf-header" class="hidden mb-8">
+                                <div class="flex justify-between items-start border-b-2 border-gray-800 pb-4">
+                                    <div>
+                                        <h1 class="text-2xl font-bold text-gray-900">PROJECT TIME SCHEDULE</h1>
+                                        <p class="text-sm text-gray-600">Generated on: {{ date('d M Y') }}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <h2 class="text-xl font-bold">{{ $project->quotation->project_name }}</h2>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="scheduleTableContainer" class="bg-white overflow-hidden shadow-sm sm:rounded-lg border">
                             <div class="overflow-x-auto relative">
                                 {{-- Overlay Chart Canvas --}}
                                 <canvas id="overlaySCurve" class="absolute top-0 left-0 pointer-events-none z-20"></canvas>
@@ -184,7 +204,100 @@
     </div>
 
     @push('head-scripts')
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
         <script>
+            async function downloadSchedulePDF() {
+                const { jsPDF } = window.jspdf;
+                const exportContainer = document.getElementById('pdf-export-container');
+                const header = document.getElementById('pdf-header');
+                const tableContainer = document.getElementById('scheduleTableContainer');
+                const scrollableDiv = tableContainer.querySelector('.overflow-x-auto');
+                const button = document.querySelector('button[onclick="downloadSchedulePDF()"]');
+                
+                // 1. Prepare for Capture
+                button.disabled = true;
+                button.innerHTML = 'Generating...';
+                
+                // Save original styles
+                const originalOverflow = scrollableDiv.style.overflow;
+                const originalWidth = scrollableDiv.style.width;
+                
+                // Reveal Header & Style Container
+                header.classList.remove('hidden');
+                exportContainer.style.backgroundColor = 'white';
+                exportContainer.style.padding = '20px';
+                
+                // Force full expansion of table
+                scrollableDiv.style.overflow = 'visible';
+                scrollableDiv.style.width = 'fit-content';
+                
+                // Force container to expand to fit the table
+                exportContainer.style.width = 'fit-content';
+                exportContainer.style.minWidth = scrollableDiv.scrollWidth + 'px'; // Ensure it grows
+                
+                // Trigger chart resize to match new full width
+                initOverlayChart();
+                await new Promise(resolve => setTimeout(resolve, 500)); // Wait for render
+
+                // 2. Capture
+                try {
+                    const canvas = await html2canvas(exportContainer, {
+                        scale: 2,
+                        useCORS: true,
+                        logging: false,
+                        windowWidth: exportContainer.scrollWidth, 
+                        windowHeight: exportContainer.scrollHeight
+                    });
+
+                    // 3. Generate PDF
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jsPDF('l', 'mm', 'a3'); 
+                    
+                    const pageWidth = 420;
+                    const pageHeight = 297;
+                    const margin = 10;
+                    
+                    // Calculate image size to fit within margins
+                    const maxImgWidth = pageWidth - (margin * 2);
+                    const maxImgHeight = pageHeight - (margin * 2);
+                    
+                    let imgWidth = maxImgWidth;
+                    let imgHeight = canvas.height * imgWidth / canvas.width;
+                    
+                    // If height is too big, scale by height instead
+                    if (imgHeight > maxImgHeight) {
+                        imgHeight = maxImgHeight;
+                        imgWidth = canvas.width * imgHeight / canvas.height;
+                    }
+
+                    // No need to add text manually, it's in the image now!
+                    pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight);
+                    pdf.save('Schedule_{{ $project->project_code }}.pdf');
+
+                } catch (error) {
+                    console.error('PDF Generation Error:', error);
+                    alert('Failed to generate PDF. Please try again.');
+                } finally {
+                    // 4. Restore
+                    header.classList.add('hidden');
+                    exportContainer.style.backgroundColor = '';
+                    exportContainer.style.padding = '';
+                    exportContainer.style.width = ''; // Restore
+                    exportContainer.style.minWidth = ''; // Restore
+                    
+                    scrollableDiv.style.overflow = originalOverflow;
+                    scrollableDiv.style.width = originalWidth;
+                    initOverlayChart(); // Restore chart to original size
+                    
+                    button.disabled = false;
+                    button.innerHTML = `
+                        <svg class="fill-current w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M13 8V2H7v6H2l8 8 8-8h-5zM0 18h20v2H0v-2z"/></svg>
+                        <span>Download Schedule</span>
+                    `;
+                }
+            }
+
             // We need to wait for the DOM to be ready to render the chart
             let mainSCurveChart = null;
             let chartData = null;
