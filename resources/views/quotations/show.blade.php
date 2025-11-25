@@ -82,6 +82,9 @@
                         <div>
                             <strong class="text-gray-600">Project:</strong>
                             <p class="text-lg">{{ $quotation->project_name }}</p>
+                            @if($quotation->location)
+                                <p class="text-sm text-gray-500">{{ $quotation->location }}</p>
+                            @endif
                         </div>
                         <div>
                             <strong class="text-gray-600">Quote #:</strong>

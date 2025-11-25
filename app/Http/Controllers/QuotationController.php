@@ -128,6 +128,7 @@ class QuotationController extends Controller
         $validatedData = $request->validate([
             'client_id' => 'required|exists:clients,id',
             'project_name' => 'required|string|max:255',
+            'location' => 'nullable|string|max:255',
             'date' => 'required|date',
             'items_json' => 'required|json',
             // [ADDED] Validate overrides_json
@@ -181,6 +182,7 @@ class QuotationController extends Controller
             $quotation = Quotation::create([
                 'client_id' => $validatedData['client_id'],
                 'project_name' => $validatedData['project_name'],
+                'location' => $validatedData['location'] ?? null,
                 'date' => $validatedData['date'],
                 'status' => 'draft',
                 'total_estimate' => 0,
@@ -477,6 +479,7 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
         $validatedData = $request->validate([
             'client_id' => 'required|exists:clients,id',
             'project_name' => 'required|string|max:255',
+            'location' => 'nullable|string|max:255',
             'date' => 'required|date',
             'items_json' => 'required|json',
             // [ADDED] Validate overrides_json
@@ -516,6 +519,7 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
             $quotation->update([
                 'client_id' => $validatedData['client_id'],
                 'project_name' => $validatedData['project_name'],
+                'location' => $validatedData['location'] ?? null,
                 'date' => $validatedData['date'],
             ]);
 
@@ -628,6 +632,7 @@ private function saveItems(array $items, int $quotationId, ?int $parentId): floa
                     'quotation_id' => $quotation->id,
                     'client_id' => $quotation->client_id,
                     'total_budget' => $quotation->total_estimate,
+                    'location' => $quotation->location,
                     'status' => 'initiated',
                 ]);
 

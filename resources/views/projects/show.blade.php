@@ -16,142 +16,152 @@
 
                     
 
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-semibold">Project Summary</h3>
-                            <div class="flex items-center space-x-1">
-                           @if ($project->status === 'initiated')
-                                <x-primary-button onclick="document.getElementById('project-update-form').submit();">
-                                    {{ __('Save Changes') }}
-                                </x-primary-button>
-                            @endif
-
-                            <a href="{{ route('reports.material_flow', $project) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-100 border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150">
-                                📊 Material Flow Report
-                            </a>
-                            <a href="{{ route('reports.project_performance', $project) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-gray-100 border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150">
-                                📈 Performance Report
-                            </a>
-                            @if ($project->status == 'in_progress')
-                                <form method="POST" action="{{ route('projects.complete', $project) }}" onsubmit="return confirm('Are you sure you want to mark this project as completed?');" class="inline">
-                                    @csrf
-                                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-green-500 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-600 active:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition ease-in-out duration-150">
-                                        Mark as Complete
-                                    </button>
-                                </form>
-                            @elseif ($project->status == 'completed')
-                                <form method="POST" action="{{ route('projects.close', $project) }}" onsubmit="return confirm('Are you sure you want to close this project? This action might restrict further changes.');" class="inline">
-                                    @csrf
-                                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-gray-500 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-600 active:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition ease-in-out duration-150">
-                                        Mark as Closed
-                                    </button>
-                                </form>
-                            @elseif ($project->status == 'closed')
-                                <span class="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-600 uppercase tracking-widest">
-                                    Project Closed
-                                </span>
-                            @endif
-                            </div>
-                        </div>
-
-                        <form method="POST" action="{{ route('projects.update', $project) }}" id="project-update-form">
-                        @csrf
-                        @method('PUT')
-
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="flex justify-between items-start mb-6">
                             <div>
-                                <x-input-label :value="__('Client')" />
-                                <p class="text-lg font-medium">{{ $project->client->name }}</p>
-                                <p class="text-sm">{{ $project->client->company_name }}</p>
-                            </div>
-
-                            <div>
-                                <x-input-label :value="__('Project Name')" />
-                                <p class="text-lg font-medium">{{ $project->quotation->project_name }}</p>
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 border-t pt-4">
-                                <div>
-                                    <x-input-label :value="__('Total Budget (Rp)')" />
-                                    <p class="text-lg font-semibold">{{ number_format($project->total_budget, 0, ',', '.') }}</p>
-                                </div>
-                                <div>
-                                    <x-input-label :value="__('Actual Cost (Rp)')" />
-                                    <p class="text-lg font-semibold text-orange-600">{{ number_format($project->actual_cost, 0, ',', '.') }}</p> {{-- Use accessor --}}
-                                </div>
-                                <div>
-                                    <x-input-label :value="__('Budget Left (Rp)')" />
-                                    <p class="text-lg font-semibold {{ $project->budget_left >= 0 ? 'text-green-600' : 'text-red-600' }}">
-                                        {{ number_format($project->budget_left, 0, ',', '.') }} {{-- Use accessor --}}
-                                    </p>
-                                </div>
-                            </div>
-                           <div>
-                                <x-input-label for="start_date" :value="__('Start Date')" />
-                                @if ($project->status === 'initiated')
-                                
-                                    <x-text-input
-                                        id="start_date"
-                                        class="block mt-1 w-full"
-                                        type="date"
-                                        name="start_date"
-                                        :value="old('start_date', $project->start_date)"
-                                    />
-                                @else
-                             
-                                    <p class="mt-1 block w-full px-3 py-2 text-gray-700">
-                                        {{ $project->start_date ? \Carbon\Carbon::parse($project->start_date)->format('Y-m-d') : 'Not set' }}
-                                    </p>
-                                    {{-- Optional: Add hidden input if value needs to be submitted even when read-only --}}
-                                    {{-- <input type="hidden" name="start_date" value="{{ $project->start_date }}"> --}}
-                                @endif
-
-                                <x-input-label for="end_date" :value="__('End Date')" class="mt-2" />
-                                @if ($project->status === 'initiated')
-            
-                                    <x-text-input
-                                        id="end_date"
-                                        class="block mt-1 w-full"
-                                        type="date"
-                                        name="end_date"
-                                        :value="old('end_date', $project->end_date)"
-                                    />
-                                @else
-        
-                                    <p class="mt-1 block w-full px-3 py-2 text-gray-700">
-                                        {{ $project->end_date ? \Carbon\Carbon::parse($project->end_date)->format('Y-m-d') : 'Not set' }}
-                                    </p>
-                                    {{-- Optional: Add hidden input if value needs to be submitted even when read-only --}}
-                                    {{-- <input type="hidden" name="end_date" value="{{ $project->end_date }}"> --}}
-                                @endif
-
-                                @if($project->actual_end_date)
-                                <x-input-label :value="__('Actual End Date')" class="mt-2 font-semibold text-green-700"/>
-                                <p class="mt-1 block w-full px-3 py-2 font-semibold text-green-700">
-                                    {{ \Carbon\Carbon::parse($project->actual_end_date)->format('Y-m-d') }}
-                                </p>
-                                @endif
-
-                            </div>
-                            <div>
-                                <x-input-label :value="__('Status')" />
-                                <p class="mt-1">
-                                    <span class="px-2 inline-flex text-sm leading-5 font-semibold rounded-full
+                                <div class="flex items-center gap-3">
+                                    <h3 class="text-2xl font-bold text-gray-900">{{ $project->quotation->project_name }}</h3>
+                                    <span class="px-3 py-1 text-sm font-semibold rounded-full
                                         @switch($project->status)
-                                            @case('initiated') bg-blue-200 text-blue-800 @break
-                                            @case('in_progress') bg-yellow-200 text-yellow-800 @break
-                                            @case('completed') bg-green-200 text-green-800 @break
+                                            @case('initiated') bg-blue-100 text-blue-800 @break
+                                            @case('in_progress') bg-yellow-100 text-yellow-800 @break
+                                            @case('completed') bg-green-100 text-green-800 @break
                                             @case('closed') bg-gray-200 text-gray-800 @break
                                         @endswitch">
                                         {{ ucfirst(str_replace('_', ' ', $project->status)) }}
                                     </span>
-                                </p>
+                                </div>
+                                <p class="text-sm text-gray-500 mt-1">{{ $project->project_code }}</p>
+                            </div>
+                            
+                            <div class="flex items-center gap-2">
+                                <a href="{{ route('reports.material_flow', $project) }}" target="_blank" class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition">
+                                    📊 Material Flow
+                                </a>
+                                <a href="{{ route('reports.project_performance', $project) }}" target="_blank" class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition">
+                                    📈 Performance
+                                </a>
+                                
+                                @if ($project->status == 'in_progress')
+                                    <form method="POST" action="{{ route('projects.complete', $project) }}" onsubmit="return confirm('Are you sure you want to mark this project as completed?');" class="inline">
+                                        @csrf
+                                        <button type="submit" class="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium shadow-sm hover:bg-green-700 transition">
+                                            Mark Complete
+                                        </button>
+                                    </form>
+                                @elseif ($project->status == 'completed')
+                                    <form method="POST" action="{{ route('projects.close', $project) }}" onsubmit="return confirm('Are you sure you want to close this project? This action might restrict further changes.');" class="inline">
+                                        @csrf
+                                        <button type="submit" class="inline-flex items-center px-3 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium shadow-sm hover:bg-gray-700 transition">
+                                            Close Project
+                                        </button>
+                                    </form>
+                                @endif
                             </div>
                         </div>
 
-                        <a href="{{ route('projects.scheduler', $project) }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50">
-                            Edit Schedule
-                        </a>
-                    </form>
+                        <form method="POST" action="{{ route('projects.update', $project) }}" id="project-update-form">
+                            @csrf
+                            @method('PUT')
+
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                                {{-- Column 1: Details --}}
+                                <div class="space-y-4">
+                                    <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Project Details</h4>
+                                    <div>
+                                        <span class="block text-xs text-gray-400">Client</span>
+                                        <p class="font-medium text-gray-900">{{ $project->client->name }}</p>
+                                        <p class="text-sm text-gray-500">{{ $project->client->company_name }}</p>
+                                    </div>
+                                    <div>
+                                        <span class="block text-xs text-gray-400">Location</span>
+                                        @if(empty($project->location) && $project->status === 'initiated')
+                                            <input type="text" name="location" 
+                                                value="{{ old('location') }}" 
+                                                class="block w-full mt-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                                placeholder="Enter location">
+                                        @else
+                                            <p class="font-medium text-gray-900">{{ $project->location ?? 'Not specified' }}</p>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                {{-- Column 2: Timeline --}}
+                                <div class="space-y-4">
+                                    <div class="flex justify-between items-center">
+                                        <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Timeline</h4>
+                                        @if ($project->status === 'initiated')
+                                            <button type="submit" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Save Dates</button>
+                                        @endif
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="start_date" class="block text-xs text-gray-400 mb-1">Start Date</label>
+                                            @if ($project->status === 'initiated')
+                                                <input type="date" name="start_date" id="start_date" 
+                                                    value="{{ old('start_date', $project->start_date) }}"
+                                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                            @else
+                                                <p class="font-medium text-gray-900">
+                                                    {{ $project->start_date ? \Carbon\Carbon::parse($project->start_date)->format('M d, Y') : '-' }}
+                                                </p>
+                                            @endif
+                                        </div>
+                                        <div>
+                                            <label for="end_date" class="block text-xs text-gray-400 mb-1">End Date</label>
+                                            @if ($project->status === 'initiated')
+                                                <input type="date" name="end_date" id="end_date" 
+                                                    value="{{ old('end_date', $project->end_date) }}"
+                                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                            @else
+                                                <p class="font-medium text-gray-900">
+                                                    {{ $project->end_date ? \Carbon\Carbon::parse($project->end_date)->format('M d, Y') : '-' }}
+                                                </p>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    
+                                    @if($project->actual_end_date)
+                                        <div>
+                                            <span class="block text-xs text-gray-400">Actual Completion</span>
+                                            <p class="font-medium text-green-600">
+                                                {{ \Carbon\Carbon::parse($project->actual_end_date)->format('M d, Y') }}
+                                            </p>
+                                        </div>
+                                    @endif
+
+                                    <div class="pt-2">
+                                        <a href="{{ route('projects.scheduler', $project) }}" class="text-sm text-indigo-600 hover:text-indigo-900 font-medium flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            View Schedule
+                                        </a>
+                                    </div>
+                                </div>
+
+                                {{-- Column 3: Financials --}}
+                                <div class="space-y-4">
+                                    <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Financials</h4>
+                                    <div class="bg-gray-50 rounded-lg p-4 space-y-3">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm text-gray-600">Total Budget</span>
+                                            <span class="font-semibold text-gray-900">Rp {{ number_format($project->total_budget, 0, ',', '.') }}</span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm text-gray-600">Actual Cost</span>
+                                            <span class="font-semibold text-orange-600">Rp {{ number_format($project->actual_cost, 0, ',', '.') }}</span>
+                                        </div>
+                                        <div class="border-t border-gray-200 pt-2 flex justify-between items-center">
+                                            <span class="text-sm font-medium text-gray-900">Remaining</span>
+                                            <span class="font-bold {{ $project->budget_left >= 0 ? 'text-green-600' : 'text-red-600' }}">
+                                                Rp {{ number_format($project->budget_left, 0, ',', '.') }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
 
                     <hr class="my-6">
 

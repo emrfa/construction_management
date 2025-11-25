@@ -39,6 +39,10 @@
                                     <input id="project_name" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" type="text" name="project_name" value="{{ old('project_name', $quotation->project_name) }}" required />
                                 </div>
                                 <div>
+                                    <label for="location" class="block font-medium text-sm text-gray-700">{{ __('Location') }}</label>
+                                    <input id="location" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" type="text" name="location" value="{{ old('location', $quotation->location) }}" />
+                                </div>
+                                <div>
                                     <label for="sub_project_name" class="block font-medium text-sm text-gray-700">{{ __('Sub Project (Optional)') }}</label>
                                     {{-- CHANGED: Pre-fill from $quotation --}}
                                     <input id="sub_project_name" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" type="text" name="sub_project_name" value="{{ old('sub_project_name', $quotation->sub_project_name ?? '') }}" />

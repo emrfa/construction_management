@@ -16,6 +16,7 @@ class Quotation extends Model
         'client_id',
         'quotation_no',
         'project_name',
+        'location',
         'date',
         'status',
         'total_estimate',

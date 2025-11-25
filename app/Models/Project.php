@@ -19,6 +19,7 @@ class Project extends Model
         'quotation_id',
         'client_id',
         'project_code',
+        'location',
         'start_date',
         'end_date',
         'actual_end_date',

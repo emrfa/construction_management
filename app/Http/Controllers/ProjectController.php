@@ -77,6 +77,7 @@ class ProjectController extends Controller
     {
         // 1. Validate the incoming data
         $validated = $request->validate([
+            'location' => 'nullable|string|max:255',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
         ]);
