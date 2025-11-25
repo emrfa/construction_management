@@ -34,12 +34,19 @@
                             </div>
                             
                             <div class="flex items-center gap-2">
-                                <a href="{{ route('reports.material_flow', $project) }}" target="_blank" class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition">
+                                <a href="{{ route('reports.material_flow', $project) }}" class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition">
                                     📊 Material Flow
                                 </a>
-                                <a href="{{ route('reports.project_performance', $project) }}" target="_blank" class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition">
-                                    📈 Performance
-                                </a>
+                                
+                                @if($project->isReadyForReport())
+                                    <a href="{{ route('reports.project_performance', $project) }}" class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition">
+                                        📈 Performance
+                                    </a>
+                                @else
+                                    <span class="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm font-medium text-gray-400 cursor-not-allowed" title="Project must be In Progress and have a Schedule to view report">
+                                        📈 Performance (Not Ready)
+                                    </span>
+                                @endif
                                 
                                 @if ($project->status == 'in_progress')
                                     <form method="POST" action="{{ route('projects.complete', $project) }}" onsubmit="return confirm('Are you sure you want to mark this project as completed?');" class="inline">

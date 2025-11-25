@@ -46,10 +46,13 @@
                                 @endphp
                                 <tr>
                                     <td class="px-4 py-3 whitespace-nowrap">
-                                        <a
-                                            href="{{ route('reports.project_performance', $project) }}" class="transition duration-150">
-                                        <div class="text-sm font-medium text-gray-900 group-hover:text-indigo-600">{{ $project->quotation->project_name }}</div>
-                                        <div class="text-xs text-gray-500">{{ $project->project_code }}</div>
+                                        @if($project->isReadyForReport())
+                                            <a href="{{ route('reports.project_performance', $project) }}" class="transition duration-150">
+                                        @else
+                                            <a href="{{ route('projects.show', $project) }}" class="transition duration-150" title="Go to Project Details (Report Not Ready)">
+                                        @endif
+                                            <div class="text-sm font-medium text-gray-900 group-hover:text-indigo-600">{{ $project->quotation->project_name }}</div>
+                                            <div class="text-xs text-gray-500">{{ $project->project_code }}</div>
                                         </a>
                                     </td>
                                     <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ $project->client->name }}</td>

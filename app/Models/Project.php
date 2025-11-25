@@ -208,4 +208,35 @@ class Project extends Model
     {
         return $this->hasMany(PurchaseOrder::class);
     }
+
+    /**
+     * Check if the project is ready for performance reporting.
+     * Returns true if status is appropriate AND schedule data exists.
+     */
+    public function isReadyForReport()
+    {
+        // 1. Status Check
+        if (!in_array($this->status, ['in_progress', 'completed', 'closed'])) {
+            return false;
+        }
+
+        // 2. Schedule Check
+        // We need either project-level dates OR task-level dates
+        $hasProjectDates = $this->start_date && $this->end_date;
+        
+        if ($hasProjectDates) {
+            return true;
+        }
+
+        // If no project dates, check if any tasks have dates
+        // We load the relationship if not already loaded to avoid N+1 if called in loop (though ideally eager loaded)
+        $this->loadMissing('quotation.allItems');
+        
+        if ($this->quotation && $this->quotation->allItems) {
+            $hasTaskDates = $this->quotation->allItems->whereNotNull('planned_start')->isNotEmpty();
+            return $hasTaskDates;
+        }
+
+        return false;
+    }
 }
