@@ -139,7 +139,7 @@
                                                 {{-- Loop through weekly planned values --}}
                                                 @foreach($task['weekly_planned'] as $weekValue)
                                                     <td class="px-4 py-4 whitespace-nowrap text-sm text-blue-600 text-right">
-                                                        {{ $weekValue > 0 ? number_format($weekValue, 2) : '-' }}
+                                                        <span class="s-curve-point">{{ $weekValue > 0 ? number_format($weekValue, 2) : '-' }}</span>
                                                     </td>
                                                 @endforeach
                                             </tr>
@@ -478,24 +478,36 @@
                 
                 if (!container || !table || !canvas) return;
 
-                // 1. Calculate Dimensions
+                // 1. Calculate Dimensions & Column Centers
                 const stickyCols = table.querySelectorAll('th.sticky');
                 let stickyWidth = 0;
                 stickyCols.forEach(col => {
                     stickyWidth += col.offsetWidth;
                 });
 
-                // Total table width - sticky width
-                const tableWidth = table.offsetWidth;
-                const chartWidth = tableWidth - stickyWidth;
+                // Get all week columns (non-sticky headers in the first row)
+                // We assume the first row of thead contains the week headers starting after sticky ones
+                const headerRow = table.querySelector('thead tr');
+                const allThs = Array.from(headerRow.children);
+                // Filter out sticky columns to get just the week columns
+                const weekCols = allThs.filter(th => !th.classList.contains('sticky'));
+
+                // Calculate total chart width based on week columns
+                let chartWidth = 0;
+                weekCols.forEach(col => {
+                    chartWidth += col.offsetWidth;
+                }); 
                 const tableHeight = table.offsetHeight;
 
                 // 2. Position & Size Canvas
                 const rows = table.querySelectorAll('tbody tr');
                 let footerHeight = 0;
+                // We have 2 footer rows now
                 if (rows.length >= 2) {
-                    footerHeight += rows[rows.length - 1].offsetHeight;
-                    footerHeight += rows[rows.length - 2].offsetHeight;
+                    const lastRow = rows[rows.length - 1];
+                    const secondLastRow = rows[rows.length - 2];
+                    if (lastRow) footerHeight += lastRow.offsetHeight;
+                    if (secondLastRow) footerHeight += secondLastRow.offsetHeight;
                 }
 
                 // Calculate header height
@@ -509,24 +521,62 @@
                 canvas.style.left = stickyWidth + 'px';
                 canvas.style.top = '0px';
 
-                // 3. Draw Chart
-                const ctx = canvas.getContext('2d');
+                // 3. Prepare Data with Exact X Coordinates
+                const plannedRaw = @json($reportData['footer_planned_percent']);
+                const actualRaw = @json($reportData['footer_actual_percent']);
                 
-                // We need data
-                const plannedData = @json($reportData['footer_planned_percent']);
-                const actualData = @json($reportData['footer_actual_percent']);
-                const labels = @json($reportData['week_labels']);
+                // Find the spans in the first row of the body to determine X positions
+                const pointSpans = table.querySelectorAll('tbody tr:first-child .s-curve-point');
+                
+                // Calculate X coordinates relative to the canvas
+                // Canvas is absolute at left:0 in the container, but we set style.left = stickyWidth
+                // So x=0 in canvas is at stickyWidth in container.
+                // We need to map span center to canvas coordinate.
+                
+                const containerRect = container.getBoundingClientRect();
+                // The canvas is positioned at 'stickyWidth' relative to the container's scrollable area?
+                // Actually, the canvas is inside the scrollable div.
+                // Let's use the canvas bounding rect to be sure.
+                const canvasRect = canvas.getBoundingClientRect();
+
+                const xCoordinates = [];
+                pointSpans.forEach(span => {
+                    const spanRect = span.getBoundingClientRect();
+                    // Center of the span relative to the canvas
+                    const centerX = (spanRect.left + spanRect.width / 2) - canvasRect.left;
+                    xCoordinates.push(centerX);
+                });
+
+                // Map to {x, y} format
+                // We assume the spans correspond 1:1 to the data points (weeks)
+                const plannedPoints = plannedRaw.map((val, index) => {
+                    if (index >= xCoordinates.length) return null;
+                    return {
+                        x: xCoordinates[index],
+                        y: val
+                    };
+                }).filter(p => p !== null);
+
+                const actualPoints = actualRaw.map((val, index) => {
+                    if (index >= xCoordinates.length) return null;
+                    return {
+                        x: xCoordinates[index],
+                        y: val
+                    };
+                }).filter(p => p !== null);
+
+                // 4. Draw Chart
+                const ctx = canvas.getContext('2d');
 
                 if (overlayChart) overlayChart.destroy();
 
                 overlayChart = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: labels,
                         datasets: [
                             {
                                 label: 'Planned',
-                                data: plannedData,
+                                data: plannedPoints,
                                 borderColor: 'rgba(59, 130, 246, 0.8)', // Blue
                                 borderWidth: 3,
                                 pointRadius: 4,
@@ -538,7 +588,7 @@
                             },
                             {
                                 label: 'Actual',
-                                data: actualData,
+                                data: actualPoints,
                                 borderColor: 'rgba(22, 163, 74, 0.8)', // Green
                                 borderWidth: 3,
                                 pointRadius: 4,
@@ -555,16 +605,19 @@
                         maintainAspectRatio: false,
                         layout: {
                             padding: {
-                                left: 20,
-                                right: 20,
+                                left: 0, // No padding, we use exact coordinates
+                                right: 0,
                                 top: headerHeight + 10,
                                 bottom: footerHeight + 10
                             }
                         },
                         scales: {
                             x: {
+                                type: 'linear', // Use linear scale for pixel coordinates
                                 display: false, 
-                                offset: true
+                                min: 0,
+                                max: chartWidth, // Match canvas width exactly
+                                offset: false
                             },
                             y: {
                                 display: false,
