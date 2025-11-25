@@ -1,34 +1,61 @@
 @php
     $isParent = $item->children->isNotEmpty();
-    $padding = $level * 20 . 'px'; // 20px indent per level
+    // Base padding (px-6 = 24px) + Indent (20px per level)
+    $paddingLeft = (24 + ($level * 20)) . 'px';
+    
+    // Determine row background based on type/level
+    $rowClass = 'bg-white';
+    if ($level === 0 && $isParent) {
+        $rowClass = 'bg-gray-100'; // Sub-Project (Neutral)
+    } elseif ($level === 1 && $isParent) {
+        $rowClass = 'bg-gray-50'; // Work Type
+    }
 @endphp
 
-<div class="grid grid-cols-12 gap-2 items-center py-2 border-b @if($isParent) bg-gray-50 @endif">
+<tr class="hover:bg-gray-50 transition-colors {{ $rowClass }}">
     
-    <div class="col-span-5" style="padding-left: {{ $padding }};">
-        <span class="@if($isParent) font-bold @endif">{{ $item->description }}</span>
-    </div>
+    {{-- Description --}}
+    <td class="py-3 whitespace-nowrap text-sm font-medium text-gray-900 pr-6" style="padding-left: {{ $paddingLeft }};">
+        <div class="flex items-center">
+            <span class="truncate @if($level === 0 && $isParent) font-bold text-gray-900 @elseif($isParent) font-semibold text-gray-800 @else text-gray-600 @endif">
+                {{ $item->description }}
+            </span>
+        </div>
+    </td>
 
-    <div class="col-span-1 text-sm">{{ $item->item_code }}</div>
+    {{-- Code --}}
+    <td class="px-3 py-3 whitespace-nowrap text-xs text-gray-400 italic">
+        @if(!$isParent)
+            {{ $item->item_code }}
+        @endif
+    </td>
 
-    <div class="col-span-1 text-sm">{{ $item->uom }}</div>
+    {{-- Unit --}}
+    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
+        @if(!$isParent)
+            {{ $item->uom }}
+        @endif
+    </td>
 
-    <div class="col-span-1 text-sm text-right">
+    {{-- Quantity --}}
+    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
         @if(!$isParent)
             {{ $item->quantity }}
         @endif
-    </div>
+    </td>
 
-    <div class="col-span-2 text-sm text-right">
+    {{-- Unit Price --}}
+    <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
         @if(!$isParent)
             {{ number_format($item->unit_price, 0, ',', '.') }}
         @endif
-    </div>
+    </td>
 
-    <div class="col-span-2 text-sm text-right font-semibold">
+    {{-- Subtotal --}}
+    <td class="px-6 py-3 whitespace-nowrap text-sm text-right font-medium @if($isParent) text-gray-900 @else text-gray-600 @endif">
         {{ number_format($item->subtotal, 0, ',', '.') }}
-    </div>
-</div>
+    </td>
+</tr>
 
 @if ($isParent)
     @foreach ($item->children as $child)
