@@ -124,9 +124,6 @@
                                         <div>
                                             <span class="block text-xs font-medium text-gray-500 uppercase mb-1">Client</span>
                                             <div class="flex items-center gap-3">
-                                                <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-sm">
-                                                    {{ substr($project->client->name, 0, 2) }}
-                                                </div>
                                                 <div>
                                                     <p class="font-semibold text-gray-900">{{ $project->client->name }}</p>
                                                     <p class="text-xs text-gray-500">{{ $project->client->company_name }}</p>
@@ -236,239 +233,269 @@
                             </div>
                         </form>
 
-                    <hr class="my-6">
+                    <hr class="my-8 border-gray-100">
 
-                    <div class="mt-6 mb-6">
-                        <div class="flex justify-between items-center mb-2">
-                            <h3 class="text-lg font-semibold">Material Requests</h3>
-                            {{-- Link to the create form, passing the project ID --}}
-                            {{-- Link to the create form, passing the project ID --}}
-                            @if($project->status === 'in_progress')
-                                <a href="{{ route('material-requests.create', ['project_id' => $project->id]) }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:border-indigo-900 focus:ring ring-indigo-300 disabled:opacity-25 transition ease-in-out duration-150 shadow-sm">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                                    Request Materials
-                                </a>
-                            @endif
+                    {{-- TABS SECTION --}}
+                    <div x-data="{ activeTab: 'wbs' }">
+                        
+                        {{-- Tab Navigation --}}
+                        <div class="border-b border-gray-200 mb-6">
+                            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                                <button @click="activeTab = 'wbs'" 
+                                    :class="activeTab === 'wbs' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                    class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                                    Work Plan (WBS)
+                                </button>
+                                <button @click="activeTab = 'materials'" 
+                                    :class="activeTab === 'materials' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                    class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                                    Material Requests
+                                </button>
+                                <button @click="activeTab = 'billings'" 
+                                    :class="activeTab === 'billings' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                    class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                                    Billings
+                                </button>
+                                <button @click="activeTab = 'stock'" 
+                                    :class="activeTab === 'stock' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                    class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                                    Stock Status
+                                </button>
+                            </nav>
                         </div>
-                        <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200 text-sm">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Req #</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requested By</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Required Date</th> 
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        @forelse ($project->materialRequests as $request)
-                                        <tr class="hover:bg-gray-50 transition-colors">
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <a href="{{ route('material-requests.show', $request) }}" class="text-indigo-600 hover:text-indigo-900 font-medium">
-                                                    {{ $request->request_code }}
-                                                </a>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ \Carbon\Carbon::parse($request->request_date)->format('d M Y') }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-gray-900">{{ $request->requester->name ?? 'N/A' }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $request->required_date ? \Carbon\Carbon::parse($request->required_date)->format('d M Y') : '-' }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full
-                                                    @switch($request->status)
-                                                        @case('draft') bg-gray-100 text-gray-800 @break
-                                                        @case('pending_approval') bg-yellow-100 text-yellow-800 @break
-                                                        @case('approved') bg-green-100 text-green-800 @break
-                                                        @case('rejected') bg-red-100 text-red-800 @break
-                                                        @case('partially_fulfilled') bg-blue-100 text-blue-800 @break
-                                                        @case('fulfilled') bg-purple-100 text-purple-800 @break
-                                                        @case('cancelled') bg-gray-100 text-gray-800 @break
-                                                    @endswitch">
-                                                    {{ ucfirst(str_replace('_', ' ', $request->status)) }}
-                                                </span>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <a href="{{ route('material-requests.show', $request) }}" class="text-indigo-600 hover:text-indigo-900">View</a>
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="6" class="px-6 py-10 text-center text-gray-500">
-                                                <div class="flex flex-col items-center justify-center">
-                                                    <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
-                                                    <p class="text-base font-medium text-gray-900">No material requests yet</p>
-                                                    <p class="text-sm text-gray-500 mt-1">Requests created for this project will appear here.</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    @endforelse
-                                    </tbody>
-                                </table>
+
+                        {{-- TAB 1: WBS / Work Plan --}}
+                        <div x-show="activeTab === 'wbs'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold text-gray-900">Work Breakdown Structure</h3>
+                                @if($project->status === 'in_progress')
+                                    <a href="{{ route('progress.create', $project) }}" class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-900 focus:outline-none focus:border-blue-900 focus:ring ring-blue-300 disabled:opacity-25 transition ease-in-out duration-150 shadow-sm">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                        Add Progress Update
+                                    </a>
+                                @endif
+                            </div>
+
+                            <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                                <div class="grid grid-cols-12 gap-4 text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3 bg-gray-50 border-b border-gray-100">
+                                    <div class="col-span-4">Description</div>             
+                                    <div class="col-span-1">Code</div>
+                                    <div class="col-span-1">UOM</div>
+                                    <div class="col-span-1 text-right">Qty</div>
+                                    <div class="col-span-1 text-right">Budget (Rp)</div>   
+                                    <div class="col-span-2 text-right">Actual Cost (Rp)</div>
+                                    <div class="col-span-1 text-right">Budget Left (Rp)</div>
+                                    <div class="col-span-1 text-center">Progress</div>
+                                </div>
+
+                                <div class="divide-y divide-gray-100">
+                                    @foreach ($project->quotation->items as $item)
+                                        @include('projects.partials.item-row', ['item' => $item, 'level' => 0])
+                                    @endforeach
+                                </div>
+                            </div>
+                            <div class="flex justify-end mt-6">
+                                <div class="w-64">
+                                    <div class="flex justify-between font-bold text-lg border-t-2 pt-2">
+                                        <span>Total Budget:</span>
+                                        <span>Rp {{ number_format($project->total_budget, 0, ',', '.') }}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <hr class="my-6">
 
-                    <div class="mt-6 mb-6">
-                        <div class="flex justify-between items-center mb-2">
-                            <h3 class="text-lg font-semibold">Billing Requests</h3>
-                            @if($project->status === 'in_progress')
-                                <a href="{{ route('billings.create', ['project_id' => $project->id]) }}" class="inline-flex items-center px-4 py-2 bg-emerald-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 active:bg-emerald-900 focus:outline-none focus:border-emerald-900 focus:ring ring-emerald-300 disabled:opacity-25 transition ease-in-out duration-150 shadow-sm">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                                    Create Billing
-                                </a>
-                            @endif
-                        </div>
+                        {{-- TAB 2: Material Requests --}}
+                        <div x-show="activeTab === 'materials'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold text-gray-900">Material Requests</h3>
+                                @if($project->status === 'in_progress')
+                                    <a href="{{ route('material-requests.create', ['project_id' => $project->id]) }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:border-indigo-900 focus:ring ring-indigo-300 disabled:opacity-25 transition ease-in-out duration-150 shadow-sm">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                        Request Materials
+                                    </a>
+                                @endif
+                            </div>
 
-                        <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200 text-sm">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Billing #</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount (Rp)</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        @forelse ($project->billings as $billing)
+                            <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Req #</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requested By</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Required Date</th> 
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            @forelse ($project->materialRequests as $request)
                                             <tr class="hover:bg-gray-50 transition-colors">
                                                 <td class="px-6 py-4 whitespace-nowrap">
-                                                    <a href="{{ route('billings.show', $billing) }}" class="text-indigo-600 hover:text-indigo-900 font-medium">
-                                                        {{ $billing->billing_no }}
+                                                    <a href="{{ route('material-requests.show', $request) }}" class="text-indigo-600 hover:text-indigo-900 font-medium">
+                                                        {{ $request->request_code }}
                                                     </a>
                                                 </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ \Carbon\Carbon::parse($billing->billing_date)->format('d M Y') }}</td>
-                                                <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{{ number_format($billing->amount, 0, ',', '.') }}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ \Carbon\Carbon::parse($request->request_date)->format('d M Y') }}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-gray-900">{{ $request->requester->name ?? 'N/A' }}</td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $request->required_date ? \Carbon\Carbon::parse($request->required_date)->format('d M Y') : '-' }}</td>
                                                 <td class="px-6 py-4 whitespace-nowrap">
                                                     <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full
-                                                        @switch($billing->status)
-                                                            @case('pending') bg-yellow-100 text-yellow-800 @break
-                                                            @case('approved') bg-blue-100 text-blue-800 @break
-                                                            @case('invoiced') bg-green-100 text-green-800 @break
+                                                        @switch($request->status)
+                                                            @case('draft') bg-gray-100 text-gray-800 @break
+                                                            @case('pending_approval') bg-yellow-100 text-yellow-800 @break
+                                                            @case('approved') bg-green-100 text-green-800 @break
                                                             @case('rejected') bg-red-100 text-red-800 @break
+                                                            @case('partially_fulfilled') bg-blue-100 text-blue-800 @break
+                                                            @case('fulfilled') bg-purple-100 text-purple-800 @break
+                                                            @case('cancelled') bg-gray-100 text-gray-800 @break
                                                         @endswitch">
-                                                        {{ ucfirst($billing->status) }}
+                                                        {{ ucfirst(str_replace('_', ' ', $request->status)) }}
                                                     </span>
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                    <a href="{{ route('billings.show', $billing) }}" class="text-indigo-600 hover:text-indigo-900">View</a>
+                                                    <a href="{{ route('material-requests.show', $request) }}" class="text-indigo-600 hover:text-indigo-900">View</a>
                                                 </td>
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="5" class="px-6 py-10 text-center text-gray-500">
+                                                <td colspan="6" class="px-6 py-10 text-center text-gray-500">
                                                     <div class="flex flex-col items-center justify-center">
-                                                        <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                                        <p class="text-base font-medium text-gray-900">No billing requests yet</p>
-                                                        <p class="text-sm text-gray-500 mt-1">Billings created for this project will appear here.</p>
+                                                        <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                                                        <p class="text-base font-medium text-gray-900">No material requests yet</p>
+                                                        <p class="text-sm text-gray-500 mt-1">Requests created for this project will appear here.</p>
                                                     </div>
                                                 </td>
                                             </tr>
                                         @endforelse
-                                    </tbody>
-                                </table>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <hr class="my-6">
+                        {{-- TAB 3: Billings --}}
+                        <div x-show="activeTab === 'billings'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold text-gray-900">Billing Requests</h3>
+                                @if($project->status === 'in_progress')
+                                    <a href="{{ route('billings.create', ['project_id' => $project->id]) }}" class="inline-flex items-center px-4 py-2 bg-emerald-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 active:bg-emerald-900 focus:outline-none focus:border-emerald-900 focus:ring ring-emerald-300 disabled:opacity-25 transition ease-in-out duration-150 shadow-sm">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                        Create Billing
+                                    </a>
+                                @endif
+                            </div>
 
-                                    <div x-data="{ open: false }" class="mt-6 mb-6">
-                    {{-- Make the header clickable --}}
-                    <div class="flex justify-between items-center mb-2 cursor-pointer" @click="open = !open">
-                        <h3 class="text-lg font-semibold">WBS Material Requirements & Stock</h3>
-                        {{-- Add a visual indicator (+/- or arrow) --}}
-                        <span class="text-indigo-600 font-medium text-xl" x-text="open ? '-' : '+'"></span>
-                    </div>
-
-                    {{-- The table container, now controlled by 'open' --}}
-                    <div x-show="open" x-transition class="overflow-x-auto mt-2 border rounded">
-                        @php
-                            // Call the new method to get the summary data
-                            $wbsMaterialSummary = $project->getMaterialStockSummary();
-                        @endphp
-                        <table class="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">UOM</th>
-                                    <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Budgeted</th>
-                                    <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Used</th>
-                                    <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">On Order</th>
-                                    <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">On Hand (Project)</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                @forelse ($wbsMaterialSummary as $material)
-                                    <tr>
-                                        <td class="px-3 py-2 whitespace-nowrap font-mono">{{ $material['item_code'] }}</td>
-                                        <td class="px-3 py-2 whitespace-nowrap">{{ $material['item_name'] }}</td>
-                                        <td class="px-3 py-2 whitespace-nowrap">{{ $material['uom'] }}</td>
-                                        <td class="px-3 py-2 whitespace-nowrap text-right">{{ number_format($material['budgeted_qty'], 2, ',', '.') }}</td>
-                                        <td class="px-3 py-2 whitespace-nowrap text-right text-orange-600">{{ number_format($material['used_qty'], 2, ',', '.') }}</td>
-                                        <td class="px-3 py-2 whitespace-nowrap text-right text-blue-600">{{ number_format($material['on_order_qty'], 2, ',', '.') }}</td>
-                                        <td class="px-3 py-2 whitespace-nowrap text-right font-semibold {{ $material['on_hand_qty'] < 0 ? 'text-red-600' : 'text-green-600' }}">
-                                            {{ number_format($material['on_hand_qty'], 2, ',', '.') }}
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="7" class="px-3 py-2 text-center text-gray-500">
-                                            No materials found in the project's WBS/RAB or no stock movements recorded.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div> {{-- End of x-show div --}}
-                </div>
-
-
-                    <hr class="my-6">
-
-                    <div class="flex justify-between items-center mb-2">
-                        <h3 class="text-lg font-semibold">Work Breakdown Structure (WBS) / Plan</h3>
-                        @if($project->status === 'in_progress')
-                            <a href="{{ route('progress.create', $project) }}" class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-lg font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-900 focus:outline-none focus:border-blue-900 focus:ring ring-blue-300 disabled:opacity-25 transition ease-in-out duration-150 shadow-sm">
-                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                                Add Progress Update
-                            </a>
-                        @endif
-                    </div>
-
-                    
-                    
-                    <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div class="grid grid-cols-12 gap-4 text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3 bg-gray-50 border-b border-gray-100">
-                            <div class="col-span-4">Description</div>             
-                            <div class="col-span-1">Code</div>
-                            <div class="col-span-1">UOM</div>
-                            <div class="col-span-1 text-right">Qty</div>
-                            <div class="col-span-1 text-right">Budget (Rp)</div>   
-                            <div class="col-span-2 text-right">Actual Cost (Rp)</div>
-                            <div class="col-span-1 text-right">Budget Left (Rp)</div>
-                            <div class="col-span-1 text-center">Progress</div>
-                        </div>
-
-                        <div class="divide-y divide-gray-100">
-                            @foreach ($project->quotation->items as $item)
-                                @include('projects.partials.item-row', ['item' => $item, 'level' => 0])
-                            @endforeach
-                        </div>
-                    </div>
-                    <div class="flex justify-end mt-6">
-                        <div class="w-64">
-                            <div class="flex justify-between font-bold text-lg border-t-2 pt-2">
-                                <span>Total Budget:</span>
-                                <span>Rp {{ number_format($project->total_budget, 0, ',', '.') }}</span>
+                            <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Billing #</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount (Rp)</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            @forelse ($project->billings as $billing)
+                                                <tr class="hover:bg-gray-50 transition-colors">
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <a href="{{ route('billings.show', $billing) }}" class="text-indigo-600 hover:text-indigo-900 font-medium">
+                                                            {{ $billing->billing_no }}
+                                                        </a>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ \Carbon\Carbon::parse($billing->billing_date)->format('d M Y') }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{{ number_format($billing->amount, 0, ',', '.') }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full
+                                                            @switch($billing->status)
+                                                                @case('pending') bg-yellow-100 text-yellow-800 @break
+                                                                @case('approved') bg-blue-100 text-blue-800 @break
+                                                                @case('invoiced') bg-green-100 text-green-800 @break
+                                                                @case('rejected') bg-red-100 text-red-800 @break
+                                                            @endswitch">
+                                                            {{ ucfirst($billing->status) }}
+                                                        </span>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                        <a href="{{ route('billings.show', $billing) }}" class="text-indigo-600 hover:text-indigo-900">View</a>
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="5" class="px-6 py-10 text-center text-gray-500">
+                                                        <div class="flex flex-col items-center justify-center">
+                                                            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                                            <p class="text-base font-medium text-gray-900">No billing requests yet</p>
+                                                            <p class="text-sm text-gray-500 mt-1">Billings created for this project will appear here.</p>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
-                    </div>
+
+                        {{-- TAB 4: Stock Status --}}
+                        <div x-show="activeTab === 'stock'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold text-gray-900">Material Requirements & Stock</h3>
+                            </div>
+
+                            <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                                @php
+                                    // Call the new method to get the summary data
+                                    $wbsMaterialSummary = $project->getMaterialStockSummary();
+                                @endphp
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">UOM</th>
+                                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Budgeted</th>
+                                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Used</th>
+                                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">On Order</th>
+                                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">On Hand (Project)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            @forelse ($wbsMaterialSummary as $material)
+                                                <tr class="hover:bg-gray-50 transition-colors">
+                                                    <td class="px-6 py-4 whitespace-nowrap font-mono text-gray-500">{{ $material['item_code'] }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{{ $material['item_name'] }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $material['uom'] }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-right">{{ number_format($material['budgeted_qty'], 2, ',', '.') }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-right text-orange-600">{{ number_format($material['used_qty'], 2, ',', '.') }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-right text-blue-600">{{ number_format($material['on_order_qty'], 2, ',', '.') }}</td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-right font-semibold {{ $material['on_hand_qty'] < 0 ? 'text-red-600' : 'text-green-600' }}">
+                                                        {{ number_format($material['on_hand_qty'], 2, ',', '.') }}
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="7" class="px-6 py-10 text-center text-gray-500">
+                                                        <div class="flex flex-col items-center justify-center">
+                                                            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                                                            <p class="text-base font-medium text-gray-900">No materials found</p>
+                                                            <p class="text-sm text-gray-500 mt-1">Check the WBS or stock transactions.</p>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div> {{-- End of x-data --}}
 
                 </div>
             </div>
