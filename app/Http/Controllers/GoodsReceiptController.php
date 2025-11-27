@@ -27,7 +27,7 @@ class GoodsReceiptController extends Controller
         $query = GoodsReceipt::with('supplier', 'purchaseOrder', 'project', 'location')->latest();
         
         // [PERMISSION] Filter by user's location access
-        if (!$user->hasRole('admin')) {
+        if (!$user->hasRole('Admin')) {
             $userLocationIds = $user->stockLocations->pluck('id');
             $query->whereIn('stock_location_id', $userLocationIds);
         }

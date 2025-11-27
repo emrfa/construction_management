@@ -294,8 +294,18 @@ class PurchaseOrderController extends Controller
         
         if (!$locationId) {
             // Not a project PO, or project has no location.
-            // Default to the "Main Warehouse"
+            // Default to the "Main Warehouse" (WH-MAIN)
             $locationId = StockLocation::where('code', 'WH-MAIN')->value('id');
+            
+            // Safety fallback: If WH-MAIN doesn't exist, pick the first active location
+            if (!$locationId) {
+                $locationId = StockLocation::where('is_active', true)->value('id');
+            }
+            
+            // If still no location, we can't create a receipt
+            if (!$locationId) {
+                throw new \Exception("No Stock Location found (checked project, WH-MAIN, and any active). Please create a Stock Location first.");
+            }
         }
         // --- END NEW LOGIC ---
 
