@@ -43,11 +43,14 @@ class MonthlyProgressExport implements FromView, ShouldAutoSize, WithStyles
         ]);
     }
 
-    public function styles(Worksheet $sheet)
+   public function styles(Worksheet $sheet)
     {
+        foreach (range('A', 'Z') as $column) {
+            $sheet->getColumnDimension($column)->setAutoSize(true);
+        }
+
         return [
-            // Style the first row as bold text
-            1    => ['font' => ['bold' => true]],
+            1 => ['font' => ['bold' => true]],
         ];
     }
 }

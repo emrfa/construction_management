@@ -1,14 +1,14 @@
     <!-- Header -->
     <tr>
-        <th colspan="10" style="font-weight: bold; font-size: 16px; text-align: center;">{{ $project->quotation->project_name }}</th>
+        <th colspan="9" style="font-weight: bold; font-size: 16px; text-align: center;">{{ $project->quotation->project_name }}</th>
     </tr>
     <tr>
-        <th colspan="10" style="font-weight: bold; font-size: 14px; text-align: center; color: #d97706;">LAPORAN KEMAJUAN PROGRAM KERJA</th>
+        <th colspan="9" style="font-weight: bold; font-size: 14px; text-align: center; color: #d97706;">LAPORAN KEMAJUAN PROGRAM KERJA</th>
     </tr>
     <tr>
-        <th colspan="10" style="text-align: center;">PERIODE BULAN : {{ \Carbon\Carbon::parse($month)->translatedFormat('F Y') }}</th>
+        <th colspan="9" style="text-align: center;">PERIODE BULAN : {{ \Carbon\Carbon::parse($month)->translatedFormat('F Y') }}</th>
     </tr>
-    <tr><td colspan="10">&nbsp;</td></tr>
+    <tr><td colspan="9">&nbsp;</td></tr>
     <tr>
         <th rowspan="2" style="width: 5px; text-align: center; font-weight: bold; background-color: #f3f4f6; border: 1px solid #000000;">NO</th>
         <th rowspan="2" style="width: 40px; text-align: left; font-weight: bold; background-color: #f3f4f6; border: 1px solid #000000;">JENIS PEKERJAAN</th>
@@ -31,7 +31,7 @@
     <!-- I. KONTRAK PEKERJAAN FISIK -->
     <tr>
         <td style="text-align: center; font-weight: bold; background-color: #e5e7eb; border: 1px solid #000000;">I</td>
-        <td colspan="10" style="font-weight: bold; background-color: #e5e7eb; border: 1px solid #000000;">KONTRAK PEKERJAAN FISIK</td>
+        <td colspan="9" style="font-weight: bold; background-color: #e5e7eb; border: 1px solid #000000;">KONTRAK PEKERJAAN FISIK</td>
     </tr>
         @foreach ($reportDataOriginal as $index => $item)
             @include('reports.partials.monthly_row_excel', ['item' => $item, 'level' => 0, 'number' => $loop->iteration])
@@ -66,7 +66,7 @@
     @if(count($reportDataAdditional) > 0)
         <tr>
             <td style="text-align: center; font-weight: bold; background-color: #e5e7eb; border: 1px solid #000000;">II</td>
-            <td colspan="10" style="font-weight: bold; background-color: #e5e7eb; border: 1px solid #000000;">PEKERJAAN TAMBAH</td>
+            <td colspan="9" style="font-weight: bold; background-color: #e5e7eb; border: 1px solid #000000;">PEKERJAAN TAMBAH</td>
         </tr>
             @foreach ($reportDataAdditional as $index => $item)
                 @include('reports.partials.monthly_row_excel', ['item' => $item, 'level' => 0, 'number' => $loop->iteration])

@@ -110,7 +110,7 @@
             <!-- I. KONTRAK PEKERJAAN FISIK -->
             <tr class="bg-gray-200 font-bold">
                 <td class="text-center">I</td>
-                <td colspan="10">KONTRAK PEKERJAAN FISIK</td>
+                <td colspan="9">KONTRAK PEKERJAAN FISIK</td>
             </tr>
             @foreach ($reportDataOriginal as $index => $item)
                 @include('reports.partials.monthly_row_pdf', ['item' => $item, 'level' => 0, 'number' => $loop->iteration])
@@ -145,7 +145,7 @@
             @if(count($reportDataAdditional) > 0)
                 <tr class="bg-gray-200 font-bold">
                     <td class="text-center">II</td>
-                    <td colspan="10">PEKERJAAN TAMBAH</td>
+                    <td colspan="9">PEKERJAAN TAMBAH</td>
                 </tr>
                 @foreach ($reportDataAdditional as $index => $item)
                     @include('reports.partials.monthly_row_pdf', ['item' => $item, 'level' => 0, 'number' => $loop->iteration])
