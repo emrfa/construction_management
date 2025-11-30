@@ -71,6 +71,11 @@ class Project extends Model
         return $this->hasMany(MaterialRequest::class);
     }
 
+    public function adendums()
+    {
+        return $this->hasMany(Adendum::class);
+    }
+
     /**
      * Get the dedicated stock location for this project.
      */

@@ -66,12 +66,18 @@ Route::middleware('auth')->group(function () {
     Route::post('/quotations/{quotation}/status', [QuotationController::class, 'updateStatus'])
      ->name('quotations.updateStatus');
 
-    // Project Management
     Route::resource('projects', ProjectController::class);
     Route::get('/projects/{project}/progress/create', [ProgressUpdateController::class, 'create'])->name('progress.create');
     Route::post('/projects/{project}/progress', [ProgressUpdateController::class, 'store'])->name('progress.store');
     Route::post('/projects/{project}/complete', [ProjectController::class, 'markAsComplete'])->name('projects.complete');
     Route::post('/projects/{project}/close', [ProjectController::class, 'markAsClosed'])->name('projects.close');
+
+    // Adendum Management
+    Route::get('/projects/{project}/adendums', [\App\Http\Controllers\AdendumController::class, 'index'])->name('projects.adendums.index');
+    Route::get('/projects/{project}/adendums/create', [\App\Http\Controllers\AdendumController::class, 'create'])->name('projects.adendums.create');
+    Route::post('/projects/{project}/adendums', [\App\Http\Controllers\AdendumController::class, 'store'])->name('projects.adendums.store');
+    Route::get('/projects/{project}/adendums/{adendum}', [\App\Http\Controllers\AdendumController::class, 'show'])->name('projects.adendums.show');
+    Route::post('/projects/{project}/adendums/{adendum}/approve', [\App\Http\Controllers\AdendumController::class, 'approve'])->name('projects.adendums.approve');
 
     // Progress Management
     Route::get('/progress/{quotation_item}/history', [ProgressUpdateController::class, 'history'])->name('progress.history');

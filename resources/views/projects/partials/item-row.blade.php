@@ -9,26 +9,38 @@
 <div class="grid grid-cols-12 gap-1 items-center py-1 border-b @if($isParent) bg-gray-50 @endif text-xs">
 
     {{-- Description --}}
-    <div class="col-span-4" style="padding-left: {{ $padding }};">
+    <div class="col-span-3" style="padding-left: {{ $padding }};">
         <span class="@if($isParent) font-bold @endif">{{ $item->description }}</span>
     </div>
 
     {{-- Code --}}
     <div class="col-span-1">{{ $item->item_code }}</div>
 
-    {{-- UOM & Qty (Combined?) - Let's keep separate for now --}}
+    {{-- UOM --}}
     <div class="col-span-1">{{ $item->uom }}</div>
-    <div class="col-span-1 text-right">
+
+    {{-- Original Qty --}}
+    <div class="col-span-1 text-right text-gray-500">
+        @if(!$isParent) {{ number_format($item->original_quantity ?? $item->quantity, 2, ',', '.') }} @endif
+    </div>
+
+    {{-- Revised Qty --}}
+    <div class="col-span-1 text-right font-medium">
         @if(!$isParent) {{ number_format($item->quantity, 2, ',', '.') }} @endif
     </div>
 
-    {{-- Item Budget --}}
+    {{-- Original Budget --}}
+    <div class="col-span-1 text-right text-gray-500">
+        {{ number_format($item->original_subtotal ?? $item->subtotal, 0, ',', '.') }}
+    </div>
+
+    {{-- Revised Budget --}}
     <div class="col-span-1 text-right font-semibold">
         {{ number_format($item->subtotal, 0, ',', '.') }}
     </div>
 
     {{-- Actual Cost --}}
-    <div class="col-span-2 text-right text-orange-600 font-semibold">
+    <div class="col-span-1 text-right text-orange-600 font-semibold">
         {{ number_format($itemActualCost, 0, ',', '.') }}
     </div>
 

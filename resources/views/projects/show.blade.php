@@ -34,17 +34,21 @@
                             </div>
                             
                             <div class="flex items-center gap-2">
+                                <a href="{{ route('projects.adendums.index', $project) }}" class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition">
+                                    📝 Adendums
+                                </a>
+
                                 <a href="{{ route('reports.material_flow', $project) }}" class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition">
                                     📊 Material Flow
                                 </a>
                                 
                                 @if($project->isReadyForReport())
                                     <a href="{{ route('reports.project_performance', $project) }}" class="inline-flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition">
-                                        📈 Performance
+                                        📈 S-Curve
                                     </a>
                                 @else
                                     <span class="inline-flex items-center px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm font-medium text-gray-400 cursor-not-allowed" title="Project must be In Progress and have a Schedule to view report">
-                                        📈 Performance (Not Ready)
+                                        📈 S-Curve (Not Ready)
                                     </span>
                                 @endif
                                 
@@ -278,13 +282,15 @@
 
                             <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                                 <div class="grid grid-cols-12 gap-4 text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3 bg-gray-50 border-b border-gray-100">
-                                    <div class="col-span-4">Description</div>             
+                                    <div class="col-span-3">Description</div>             
                                     <div class="col-span-1">Code</div>
                                     <div class="col-span-1">UOM</div>
-                                    <div class="col-span-1 text-right">Qty</div>
-                                    <div class="col-span-1 text-right">Budget (Rp)</div>   
-                                    <div class="col-span-2 text-right">Actual Cost (Rp)</div>
-                                    <div class="col-span-1 text-right">Budget Left (Rp)</div>
+                                    <div class="col-span-1 text-right">Original Qty</div>
+                                    <div class="col-span-1 text-right">Revised Qty</div>
+                                    <div class="col-span-1 text-right">Original Budget</div>   
+                                    <div class="col-span-1 text-right">Revised Budget</div>
+                                    <div class="col-span-1 text-right">Actual Cost</div>
+                                    <div class="col-span-1 text-right">Budget Left</div>
                                     <div class="col-span-1 text-center">Progress</div>
                                 </div>
 

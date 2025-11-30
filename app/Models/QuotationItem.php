@@ -139,5 +139,8 @@ class QuotationItem extends Model
         return $this->hasMany(MaterialRequestItem::class);
     }
 
-
+    public function adendum()
+    {
+        return $this->belongsTo(Adendum::class);
+    }
 }
