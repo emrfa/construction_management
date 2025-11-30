@@ -11,6 +11,21 @@
                            class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                            onchange="this.form.submit()">
                 </form>
+
+                <!-- Export Buttons -->
+                <div class="flex space-x-2">
+                    <a href="{{ route('reports.monthly_progress.export', ['project' => $project, 'month' => $month, 'type' => 'pdf']) }}" 
+                       class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700 active:bg-red-900 focus:outline-none focus:border-red-900 focus:ring ring-red-300 disabled:opacity-25 transition ease-in-out duration-150">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        PDF
+                    </a>
+                    <a href="{{ route('reports.monthly_progress.export', ['project' => $project, 'month' => $month, 'type' => 'excel']) }}" 
+                       class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 active:bg-green-900 focus:outline-none focus:border-green-900 focus:ring ring-green-300 disabled:opacity-25 transition ease-in-out duration-150">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Excel
+                    </a>
+                </div>
+
                 <a href="{{ route('projects.show', $project) }}" class="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300 active:bg-gray-300 focus:outline-none focus:border-gray-900 focus:ring ring-gray-300 disabled:opacity-25 transition ease-in-out duration-150">
                     {{ __('Back to Project') }}
                 </a>
@@ -84,14 +99,26 @@
                                     <td class="border border-gray-300 px-2 py-1 text-right">
                                         {{ number_format(collect($reportDataOriginal)->sum('previous_bobot'), 3) }}%
                                     </td>
-                                    <td class="border border-gray-300 px-2 py-1 text-right"></td>
+                                    <td class="border border-gray-300 px-2 py-1 text-right">
+                                        @if(collect($reportDataOriginal)->sum('weight') > 0)
+                                            {{ number_format((collect($reportDataOriginal)->sum('previous_bobot') / collect($reportDataOriginal)->sum('weight')) * 100, 2) }}%
+                                        @else
+                                            0.00%
+                                        @endif
+                                    </td>
                                     <td class="border border-gray-300 px-2 py-1 text-right">
                                         {{ number_format(collect($reportDataOriginal)->sum('increase_bobot'), 3) }}%
                                     </td>
                                     <td class="border border-gray-300 px-2 py-1 text-right">
                                         {{ number_format(collect($reportDataOriginal)->sum('current_bobot'), 3) }}%
                                     </td>
-                                    <td class="border border-gray-300 px-2 py-1 text-right"></td>
+                                    <td class="border border-gray-300 px-2 py-1 text-right">
+                                        @if(collect($reportDataOriginal)->sum('weight') > 0)
+                                            {{ number_format((collect($reportDataOriginal)->sum('current_bobot') / collect($reportDataOriginal)->sum('weight')) * 100, 2) }}%
+                                        @else
+                                            0.00%
+                                        @endif
+                                    </td>
                                     <td class="border border-gray-300 px-2 py-1 text-right">
                                         {{ number_format(collect($reportDataOriginal)->sum('current_value_rp') / 1000000, 3) }}
                                     </td>
@@ -119,14 +146,26 @@
                                         <td class="border border-gray-300 px-2 py-1 text-right">
                                             {{ number_format(collect($reportDataAdditional)->sum('previous_bobot'), 3) }}%
                                         </td>
-                                        <td class="border border-gray-300 px-2 py-1 text-right"></td>
+                                        <td class="border border-gray-300 px-2 py-1 text-right">
+                                            @if(collect($reportDataAdditional)->sum('weight') > 0)
+                                                {{ number_format((collect($reportDataAdditional)->sum('previous_bobot') / collect($reportDataAdditional)->sum('weight')) * 100, 2) }}%
+                                            @else
+                                                0.00%
+                                            @endif
+                                        </td>
                                         <td class="border border-gray-300 px-2 py-1 text-right">
                                             {{ number_format(collect($reportDataAdditional)->sum('increase_bobot'), 3) }}%
                                         </td>
                                         <td class="border border-gray-300 px-2 py-1 text-right">
                                             {{ number_format(collect($reportDataAdditional)->sum('current_bobot'), 3) }}%
                                         </td>
-                                        <td class="border border-gray-300 px-2 py-1 text-right"></td>
+                                        <td class="border border-gray-300 px-2 py-1 text-right">
+                                            @if(collect($reportDataAdditional)->sum('weight') > 0)
+                                                {{ number_format((collect($reportDataAdditional)->sum('current_bobot') / collect($reportDataAdditional)->sum('weight')) * 100, 2) }}%
+                                            @else
+                                                0.00%
+                                            @endif
+                                        </td>
                                         <td class="border border-gray-300 px-2 py-1 text-right">
                                             {{ number_format(collect($reportDataAdditional)->sum('current_value_rp') / 1000000, 3) }}
                                         </td>
@@ -145,7 +184,7 @@
                                         {{ number_format(collect($reportDataOriginal)->merge($reportDataAdditional)->sum('previous_bobot'), 3) }}%
                                     </td>
                                     <td class="border border-gray-300 px-2 py-1 text-right">
-                                        <!-- Weighted Average Progress? Or just leave blank as it's mixed -->
+                                        {{ number_format(collect($reportDataOriginal)->merge($reportDataAdditional)->sum('previous_bobot'), 2) }}%
                                     </td>
 
                                     <!-- Increase -->
@@ -158,7 +197,7 @@
                                         {{ number_format(collect($reportDataOriginal)->merge($reportDataAdditional)->sum('current_bobot'), 3) }}%
                                     </td>
                                     <td class="border border-gray-300 px-2 py-1 text-right">
-                                        <!-- Weighted Average Progress -->
+                                        {{ number_format(collect($reportDataOriginal)->merge($reportDataAdditional)->sum('current_bobot'), 2) }}%
                                     </td>
                                     <td class="border border-gray-300 px-2 py-1 text-right">
                                         {{ number_format(collect($reportDataOriginal)->merge($reportDataAdditional)->sum('current_value_rp') / 1000000, 3) }}

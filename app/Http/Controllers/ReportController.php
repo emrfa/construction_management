@@ -15,6 +15,10 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 
+use App\Exports\MonthlyProgressExport;
+use Maatwebsite\Excel\Facades\Excel;
+use Barryvdh\DomPDF\Facade\Pdf;
+
 class ReportController extends Controller
 {
     public function materialFlowReport(Project $project)
@@ -437,50 +441,90 @@ class ReportController extends Controller
     public function monthlyProgressReport(Project $project, Request $request)
     {
         $month = $request->input('month', Carbon::now()->format('Y-m'));
+        $data = $this->getMonthlyProgressData($project, $month);
+
+        return view('reports.monthly_progress', [
+            'project' => $project,
+            'reportDataOriginal' => $data['reportDataOriginal'],
+            'reportDataAdditional' => $data['reportDataAdditional'],
+            'month' => $month,
+            'grandTotalContract' => $data['grandTotalContract'],
+            'totalOriginalContract' => $data['totalOriginalContract'],
+            'totalAdditionalContract' => $data['totalAdditionalContract']
+        ]);
+    }
+    public function exportMonthlyProgress(Project $project, Request $request)
+    {
+        $type = $request->input('type', 'pdf'); // 'pdf' or 'excel'
+        $month = $request->input('month', Carbon::now()->format('Y-m'));
+        
+        // --- REUSE DATA LOGIC (Ideally refactor to a service, but for now copying logic) ---
+        // To avoid code duplication, we should extract the data preparation logic.
+        // However, for safety in this task, I will call a private method or duplicate carefully.
+        // Let's extract the logic to a private method `getMonthlyProgressData`.
+        
+        $data = $this->getMonthlyProgressData($project, $month);
+        
+        if ($type === 'excel') {
+            return Excel::download(new MonthlyProgressExport(
+                $project,
+                $data['reportDataOriginal'],
+                $data['reportDataAdditional'],
+                $month,
+                $data['grandTotalContract'],
+                $data['totalOriginalContract'],
+                $data['totalAdditionalContract']
+            ), 'monthly_progress_' . $project->id . '_' . $month . '.xlsx');
+        } else {
+            // PDF
+            $pdf = Pdf::loadView('reports.monthly_progress_pdf', [
+                'project' => $project,
+                'reportDataOriginal' => $data['reportDataOriginal'],
+                'reportDataAdditional' => $data['reportDataAdditional'],
+                'month' => $month,
+                'grandTotalContract' => $data['grandTotalContract'],
+                'totalOriginalContract' => $data['totalOriginalContract'],
+                'totalAdditionalContract' => $data['totalAdditionalContract']
+            ]);
+            
+            $pdf->setPaper('a4', 'landscape');
+            $pdf->setOption(['isRemoteEnabled' => true]);
+            return $pdf->download('monthly_progress_' . $project->id . '_' . $month . '.pdf');
+        }
+    }
+
+    private function getMonthlyProgressData(Project $project, $month)
+    {
         $startDate = Carbon::parse($month)->startOfMonth();
         $endDate = Carbon::parse($month)->endOfMonth();
-        
-        // Previous month end date (for calculating previous progress)
-        // Use subSecond() to get 23:59:59 of the previous day (which is the last day of prev month)
         $previousEndDate = $startDate->copy()->subSecond();
 
         $project->load([
-            'quotation.allItems.children', // Load hierarchy
-            'quotation.allItems.progressUpdates' // Load updates
+            'quotation.allItems.children',
+            'quotation.allItems.progressUpdates'
         ]);
 
-        // 1. Separate Original Items vs Additional Items (Adendums)
-        // Original: Top level items where adendum_id is null
         $originalItems = $project->quotation->allItems->filter(fn($item) => $item->parent_id === null && $item->adendum_id === null);
-        
-        // Additional: Top level items where adendum_id is NOT null
         $additionalItems = $project->quotation->allItems->filter(fn($item) => $item->parent_id === null && $item->adendum_id !== null);
 
         $reportDataOriginal = [];
         $reportDataAdditional = [];
 
-        // 2. Calculate Totals
-        
-        $totalOriginalContract = $originalItems->sum('subtotal'); 
-        
         $totalOriginalContract = $project->quotation->allItems->whereNull('parent_id')->whereNull('adendum_id')->sum('subtotal');
         $totalAdditionalContract = $project->quotation->allItems->whereNull('parent_id')->whereNotNull('adendum_id')->sum('subtotal');
         
         $grandTotalContract = $totalOriginalContract + $totalAdditionalContract;
 
-        // Fallback if 0
         if ($grandTotalContract == 0) {
-             $grandTotalContract = 1; // Avoid division by zero
+             $grandTotalContract = 1;
         }
 
-        // Helper function to process items recursively
         $processItem = function ($item) use (&$processItem, $previousEndDate, $endDate, $grandTotalContract) {
             $data = [
                 'id' => $item->id,
                 'item_code' => $item->item_code,
                 'description' => $item->description,
                 'contract_value' => (float)$item->subtotal,
-                // Weight is relative to GRAND TOTAL
                 'weight' => 0, 
                 'previous_progress_percent' => 0,
                 'current_progress_percent' => 0,
@@ -495,18 +539,15 @@ class ReportController extends Controller
                     $childrenContractValue += $childData['contract_value'];
                 }
                 
-                // If parent subtotal is 0, use sum of children
                 if ($data['contract_value'] == 0) {
                     $data['contract_value'] = $childrenContractValue;
                 }
 
-                // Aggregate for parent
                 $weightedPreviousProgress = 0;
                 $weightedCurrentProgress = 0;
                 
                 if ($data['contract_value'] > 0) {
                     foreach ($data['children'] as $childData) {
-                        // Contribution = (Child Value / Parent Value) * Child Progress
                         $ratio = $childData['contract_value'] / $data['contract_value'];
                         $weightedPreviousProgress += $childData['previous_progress_percent'] * $ratio;
                         $weightedCurrentProgress += $childData['current_progress_percent'] * $ratio;
@@ -517,9 +558,6 @@ class ReportController extends Controller
                 $data['current_progress_percent'] = $weightedCurrentProgress;
 
             } else {
-                // Leaf item: calculate from progress updates
-                
-                // Previous Progress
                 $previousUpdate = $item->progressUpdates
                     ->where('date', '<=', $previousEndDate)
                     ->sortByDesc('date')
@@ -527,7 +565,6 @@ class ReportController extends Controller
                     ->first();
                 $data['previous_progress_percent'] = $previousUpdate ? (float)$previousUpdate->percent_complete : 0;
 
-                // Current Progress
                 $currentUpdate = $item->progressUpdates
                     ->where('date', '<=', $endDate)
                     ->sortByDesc('date')
@@ -536,22 +573,13 @@ class ReportController extends Controller
                 $data['current_progress_percent'] = $currentUpdate ? (float)$currentUpdate->percent_complete : 0;
             }
 
-            // Calculate Weight relative to GRAND TOTAL
             $data['weight'] = ($data['contract_value'] / $grandTotalContract) * 100;
-
-            // Round percentages
             $data['previous_progress_percent'] = round($data['previous_progress_percent'], 4);
             $data['current_progress_percent'] = round($data['current_progress_percent'], 4);
-
-            // Calculate derived values
             $data['previous_bobot'] = ($data['previous_progress_percent'] / 100) * $data['weight'];
             $data['current_bobot'] = ($data['current_progress_percent'] / 100) * $data['weight'];
-            
             $data['increase_percent'] = $data['current_progress_percent'] - $data['previous_progress_percent'];
-            
-            // Increase Bobot = Current Bobot - Previous Bobot
             $data['increase_bobot'] = $data['current_bobot'] - $data['previous_bobot'];
-            
             $data['current_value_rp'] = ($data['current_progress_percent'] / 100) * $data['contract_value'];
 
             return $data;
@@ -565,14 +593,12 @@ class ReportController extends Controller
             $reportDataAdditional[] = $processItem($item);
         }
 
-        return view('reports.monthly_progress', [
-            'project' => $project,
+        return [
             'reportDataOriginal' => $reportDataOriginal,
             'reportDataAdditional' => $reportDataAdditional,
-            'month' => $month,
             'grandTotalContract' => $grandTotalContract,
             'totalOriginalContract' => $totalOriginalContract,
             'totalAdditionalContract' => $totalAdditionalContract
-        ]);
+        ];
     }
 }
