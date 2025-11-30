@@ -20,6 +20,9 @@ class QuotationItem extends Model
         'unit_price',
         'subtotal',
         'sort_order',
+        'adendum_id',
+        'original_quantity',
+        'original_subtotal',
     ];
 
     protected $casts = [

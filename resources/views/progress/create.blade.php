@@ -162,7 +162,29 @@
     </div>
 
     @push('scripts')
+    <style>
+        /* Chrome, Safari, Edge, Opera */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+        }
+
+        /* Firefox */
+        input[type=number] {
+        -moz-appearance: textfield;
+        }
+    </style>
     <script>
+    // Prevent scroll from changing number input values
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('input[type=number]').forEach(input => {
+            input.addEventListener('wheel', (e) => {
+                e.preventDefault();
+            });
+        });
+    });
+
     document.addEventListener('alpine:init', () => {
         Alpine.data('progressForm', (initialData) => ({
             materials: initialData.materials,

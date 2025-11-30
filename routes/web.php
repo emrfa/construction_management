@@ -228,6 +228,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/reports/project-performance/{project}', [ReportController::class, 'projectPerformanceReport'])
     ->name('reports.project_performance');
 
+    Route::get('/reports/monthly-progress/{project}', [ReportController::class, 'monthlyProgressReport'])
+    ->name('reports.monthly_progress');
+
     // Equipment
     Route::resource('equipment', EquipmentController::class);
 

@@ -430,4 +430,149 @@ class ReportController extends Controller
 
         return view('reports.stock_balance', ['balances' => $sortedBalances]);
     }
+
+    /**
+     * Show the Monthly Progress Report.
+     */
+    public function monthlyProgressReport(Project $project, Request $request)
+    {
+        $month = $request->input('month', Carbon::now()->format('Y-m'));
+        $startDate = Carbon::parse($month)->startOfMonth();
+        $endDate = Carbon::parse($month)->endOfMonth();
+        
+        // Previous month end date (for calculating previous progress)
+        // Use subSecond() to get 23:59:59 of the previous day (which is the last day of prev month)
+        $previousEndDate = $startDate->copy()->subSecond();
+
+        $project->load([
+            'quotation.allItems.children', // Load hierarchy
+            'quotation.allItems.progressUpdates' // Load updates
+        ]);
+
+        // 1. Separate Original Items vs Additional Items (Adendums)
+        // Original: Top level items where adendum_id is null
+        $originalItems = $project->quotation->allItems->filter(fn($item) => $item->parent_id === null && $item->adendum_id === null);
+        
+        // Additional: Top level items where adendum_id is NOT null
+        $additionalItems = $project->quotation->allItems->filter(fn($item) => $item->parent_id === null && $item->adendum_id !== null);
+
+        $reportDataOriginal = [];
+        $reportDataAdditional = [];
+
+        // 2. Calculate Totals
+        
+        $totalOriginalContract = $originalItems->sum('subtotal'); 
+        
+        $totalOriginalContract = $project->quotation->allItems->whereNull('parent_id')->whereNull('adendum_id')->sum('subtotal');
+        $totalAdditionalContract = $project->quotation->allItems->whereNull('parent_id')->whereNotNull('adendum_id')->sum('subtotal');
+        
+        $grandTotalContract = $totalOriginalContract + $totalAdditionalContract;
+
+        // Fallback if 0
+        if ($grandTotalContract == 0) {
+             $grandTotalContract = 1; // Avoid division by zero
+        }
+
+        // Helper function to process items recursively
+        $processItem = function ($item) use (&$processItem, $previousEndDate, $endDate, $grandTotalContract) {
+            $data = [
+                'id' => $item->id,
+                'item_code' => $item->item_code,
+                'description' => $item->description,
+                'contract_value' => (float)$item->subtotal,
+                // Weight is relative to GRAND TOTAL
+                'weight' => 0, 
+                'previous_progress_percent' => 0,
+                'current_progress_percent' => 0,
+                'children' => []
+            ];
+
+            if ($item->children->isNotEmpty()) {
+                $childrenContractValue = 0;
+                foreach ($item->children as $child) {
+                    $childData = $processItem($child);
+                    $data['children'][] = $childData;
+                    $childrenContractValue += $childData['contract_value'];
+                }
+                
+                // If parent subtotal is 0, use sum of children
+                if ($data['contract_value'] == 0) {
+                    $data['contract_value'] = $childrenContractValue;
+                }
+
+                // Aggregate for parent
+                $weightedPreviousProgress = 0;
+                $weightedCurrentProgress = 0;
+                
+                if ($data['contract_value'] > 0) {
+                    foreach ($data['children'] as $childData) {
+                        // Contribution = (Child Value / Parent Value) * Child Progress
+                        $ratio = $childData['contract_value'] / $data['contract_value'];
+                        $weightedPreviousProgress += $childData['previous_progress_percent'] * $ratio;
+                        $weightedCurrentProgress += $childData['current_progress_percent'] * $ratio;
+                    }
+                }
+                
+                $data['previous_progress_percent'] = $weightedPreviousProgress;
+                $data['current_progress_percent'] = $weightedCurrentProgress;
+
+            } else {
+                // Leaf item: calculate from progress updates
+                
+                // Previous Progress
+                $previousUpdate = $item->progressUpdates
+                    ->where('date', '<=', $previousEndDate)
+                    ->sortByDesc('date')
+                    ->sortByDesc('id')
+                    ->first();
+                $data['previous_progress_percent'] = $previousUpdate ? (float)$previousUpdate->percent_complete : 0;
+
+                // Current Progress
+                $currentUpdate = $item->progressUpdates
+                    ->where('date', '<=', $endDate)
+                    ->sortByDesc('date')
+                    ->sortByDesc('id')
+                    ->first();
+                $data['current_progress_percent'] = $currentUpdate ? (float)$currentUpdate->percent_complete : 0;
+            }
+
+            // Calculate Weight relative to GRAND TOTAL
+            $data['weight'] = ($data['contract_value'] / $grandTotalContract) * 100;
+
+            // Round percentages
+            $data['previous_progress_percent'] = round($data['previous_progress_percent'], 4);
+            $data['current_progress_percent'] = round($data['current_progress_percent'], 4);
+
+            // Calculate derived values
+            $data['previous_bobot'] = ($data['previous_progress_percent'] / 100) * $data['weight'];
+            $data['current_bobot'] = ($data['current_progress_percent'] / 100) * $data['weight'];
+            
+            $data['increase_percent'] = $data['current_progress_percent'] - $data['previous_progress_percent'];
+            
+            // Increase Bobot = Current Bobot - Previous Bobot
+            $data['increase_bobot'] = $data['current_bobot'] - $data['previous_bobot'];
+            
+            $data['current_value_rp'] = ($data['current_progress_percent'] / 100) * $data['contract_value'];
+
+            return $data;
+        };
+
+        foreach ($originalItems as $item) {
+            $reportDataOriginal[] = $processItem($item);
+        }
+        
+        foreach ($additionalItems as $item) {
+            $reportDataAdditional[] = $processItem($item);
+        }
+
+        return view('reports.monthly_progress', [
+            'project' => $project,
+            'reportDataOriginal' => $reportDataOriginal,
+            'reportDataAdditional' => $reportDataAdditional,
+            'month' => $month,
+            'grandTotalContract' => $grandTotalContract,
+            'totalOriginalContract' => $totalOriginalContract,
+            'totalAdditionalContract' => $totalAdditionalContract
+        ]);
+    }
 }
