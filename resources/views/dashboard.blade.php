@@ -1,11 +1,14 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Executive Dashboard') }}
-        </h2>
+        <div class="flex justify-between items-center">
+            <h2 class="font-bold text-2xl text-gray-800 leading-tight">
+                {{ __('Executive Overview') }}
+            </h2>
+            <span class="text-sm text-gray-500">Last updated: {{ now()->format('d M Y, H:i') }}</span>
+        </div>
     </x-slot>
 
-    <div class="py-12">
+    <div class="py-8 bg-gray-50 min-h-screen">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
 
             @php
@@ -15,81 +18,275 @@
                 $sign = $value < 0 ? '-' : '';
                 
                 if ($absVal >= 1000000000) {
-                    return $sign . '<span class="text-2xl align-top">Rp</span>' . number_format($absVal / 1000000000, 1) . '<span class="text-2xl">B</span>';
+                    return $sign . '<span class="text-lg align-top text-gray-500 font-normal">Rp</span>' . number_format($absVal / 1000000000, 1) . '<span class="text-lg text-gray-500 font-normal">B</span>';
                 } elseif ($absVal >= 1000000) {
-                    return $sign . '<span class="text-2xl align-top">Rp</span>' . number_format($absVal / 1000000, 1) . '<span class="text-2xl">M</span>';
+                    return $sign . '<span class="text-lg align-top text-gray-500 font-normal">Rp</span>' . number_format($absVal / 1000000, 1) . '<span class="text-lg text-gray-500 font-normal">M</span>';
                 } elseif ($absVal >= 1000) {
-                    return $sign . '<span class="text-2xl align-top">Rp</span>' . number_format($absVal / 1000, 1) . '<span class="text-2xl">K</span>';
+                    return $sign . '<span class="text-lg align-top text-gray-500 font-normal">Rp</span>' . number_format($absVal / 1000, 1) . '<span class="text-lg text-gray-500 font-normal">K</span>';
                 }
-                return $sign . '<span class="text-2xl align-top">Rp</span>' . number_format($absVal, 0);
+                return $sign . '<span class="text-lg align-top text-gray-500 font-normal">Rp</span>' . number_format($absVal, 0);
             }
             @endphp
-            {{-- 5. Active Projects Rich Table --}}
-            <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Active Project Health</h3>
-                <div class="mt-4 border rounded-lg overflow-x-auto">
+
+            {{-- 1. CEO SNAPSHOT --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                
+                {{-- Card 1: Total Active Value --}}
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Active Projects Value</p>
+                            <h3 class="mt-2 text-3xl font-bold text-gray-900">
+                                {!! formatCurrencyKPI($totalActiveProjectValue) !!}
+                            </h3>
+                        </div>
+                        <div class="p-2 bg-blue-50 rounded-lg">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center text-sm">
+                        <span class="text-gray-500">{{ $activeProjectsCount }} active projects</span>
+                    </div>
+                </div>
+
+                {{-- Card 2: Net Project Profit (Total CV) --}}
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Net Project Profit (CV)</p>
+                            <h3 class="mt-2 text-3xl font-bold {{ $totalCostVariance >= 0 ? 'text-green-600' : 'text-red-600' }}">
+                                {!! formatCurrencyKPI($totalCostVariance) !!}
+                            </h3>
+                        </div>
+                        <div class="p-2 {{ $totalCostVariance >= 0 ? 'bg-green-50' : 'bg-red-50' }} rounded-lg">
+                            <svg class="w-6 h-6 {{ $totalCostVariance >= 0 ? 'text-green-600' : 'text-red-600' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center text-sm">
+                        <span class="font-medium {{ $totalCpi >= 1 ? 'text-green-600' : 'text-red-600' }}">CPI: {{ number_format($totalCpi, 2) }}</span>
+                        <span class="mx-2 text-gray-300">|</span>
+                        <span class="text-gray-500">Efficiency Index</span>
+                    </div>
+                </div>
+
+                {{-- Card 3: Outstanding Invoices --}}
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Outstanding Invoices</p>
+                            <h3 class="mt-2 text-3xl font-bold text-gray-900">
+                                {!! formatCurrencyKPI($outstandingInvoices) !!}
+                            </h3>
+                        </div>
+                        <div class="p-2 bg-yellow-50 rounded-lg">
+                            <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center text-sm">
+                        @if($outstandingTrend > 0)
+                            <span class="text-red-600 flex items-center font-medium">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                                {{ number_format(abs($outstandingTrend), 1) }}%
+                            </span>
+                            <span class="ml-2 text-gray-500">vs last month</span>
+                        @elseif($outstandingTrend < 0)
+                            <span class="text-green-600 flex items-center font-medium">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>
+                                {{ number_format(abs($outstandingTrend), 1) }}%
+                            </span>
+                            <span class="ml-2 text-gray-500">vs last month</span>
+                        @else
+                            <span class="text-gray-500">No change vs last month</span>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Card 4: Risk Summary --}}
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Projects at Risk</p>
+                            <h3 class="mt-2 text-3xl font-bold {{ ($projectsOverBudgetCount + $projectsDelayedCount) > 0 ? 'text-red-600' : 'text-green-600' }}">
+                                {{ $projectsOverBudgetCount + $projectsDelayedCount }}
+                            </h3>
+                        </div>
+                        <div class="p-2 {{ ($projectsOverBudgetCount + $projectsDelayedCount) > 0 ? 'bg-red-50' : 'bg-green-50' }} rounded-lg">
+                            <svg class="w-6 h-6 {{ ($projectsOverBudgetCount + $projectsDelayedCount) > 0 ? 'text-red-600' : 'text-green-600' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center text-sm">
+                        <span class="text-gray-500">Requires attention</span>
+                    </div>
+                </div>
+            </div>
+
+            {{-- 2. RISK HIGHLIGHTS --}}
+            @if($projectsOverBudgetCount > 0 || $projectsDelayedCount > 0 || $overdueInvoicesCount > 0 || $latePurchaseOrders->count() > 0)
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                @if($projectsOverBudgetCount > 0)
+                <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg flex items-center justify-between">
+                    <div>
+                        <p class="text-red-800 font-bold">{{ $projectsOverBudgetCount }} Projects</p>
+                        <p class="text-red-600 text-xs">Over Budget</p>
+                    </div>
+                    <a href="{{ route('projects.index', ['filter' => 'over_budget']) }}" class="text-red-600 hover:text-red-800 text-sm font-medium">View &rarr;</a>
+                </div>
+                @endif
+
+                @if($projectsDelayedCount > 0)
+                <div class="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg flex items-center justify-between">
+                    <div>
+                        <p class="text-orange-800 font-bold">{{ $projectsDelayedCount }} Projects</p>
+                        <p class="text-orange-600 text-xs">Behind Schedule</p>
+                    </div>
+                    <a href="{{ route('projects.index', ['filter' => 'delayed']) }}" class="text-orange-600 hover:text-orange-800 text-sm font-medium">View &rarr;</a>
+                </div>
+                @endif
+
+                @if($overdueInvoicesCount > 0)
+                <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg flex items-center justify-between">
+                    <div>
+                        <p class="text-yellow-800 font-bold">{{ $overdueInvoicesCount }} Invoices</p>
+                        <p class="text-yellow-600 text-xs">Overdue ({!! formatCurrencyKPI($overdueInvoicesSum) !!})</p>
+                    </div>
+                    <a href="{{ route('invoices.index') }}" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium">View &rarr;</a>
+                </div>
+                @endif
+
+                @if($latePurchaseOrders->count() > 0)
+                <div class="bg-gray-100 border-l-4 border-gray-500 p-4 rounded-r-lg flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-800 font-bold">{{ $latePurchaseOrders->count() }} POs</p>
+                        <p class="text-gray-600 text-xs">Late Delivery</p>
+                    </div>
+                    <a href="{{ route('purchase-orders.index') }}" class="text-gray-600 hover:text-gray-800 text-sm font-medium">View &rarr;</a>
+                </div>
+                @endif
+            </div>
+            @endif
+
+            {{-- 3. TOP PROJECTS WIDGET & CHARTS --}}
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                {{-- Column 1: Top 5 Projects by Profit/Loss --}}
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Top Performance (Profit/Loss)</h3>
+                    <div class="space-y-4">
+                        @foreach($topProjectsByProfit as $project)
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition cursor-pointer" onclick="window.location='{{ route('reports.project_performance', $project) }}'">
+                                <div class="flex-1 min-w-0 mr-4">
+                                    <p class="text-sm font-semibold text-gray-900 truncate" title="{{ $project->quotation->project_name }}">
+                                        {{ $project->quotation->project_name }}
+                                    </p>
+                                    <p class="text-xs text-gray-500">{{ $project->project_code }}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm font-bold {{ $project->cost_variance >= 0 ? 'text-green-600' : 'text-red-600' }}">
+                                        {!! formatCurrencyKPI($project->cost_variance) !!}
+                                    </p>
+                                    <p class="text-xs text-gray-500">Variance</p>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-gray-100 text-center">
+                         <a href="{{ route('projects.index') }}" class="text-sm text-indigo-600 font-medium hover:text-indigo-800">View All Projects</a>
+                    </div>
+                </div>
+
+                {{-- Column 2 & 3: Charts --}}
+                <div class="lg:col-span-2 space-y-8">
+                    {{-- Cash Flow Chart --}}
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-lg font-bold text-gray-900">Cash Flow (6 Months)</h3>
+                            <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-blue-100 text-blue-800">Invoiced vs Paid</span>
+                        </div>
+                        <div class="h-64">
+                            <canvas id="cashFlowChart"></canvas>
+                        </div>
+                    </div>
+
+                    {{-- Cost Variance Chart --}}
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-lg font-bold text-gray-900">Project Cost Variance</h3>
+                            <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-gray-100 text-gray-800">Profit vs Loss</span>
+                        </div>
+                        <div class="h-64">
+                            <canvas id="costVarianceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- 4. SIMPLIFIED ACTIVE PROJECTS TABLE --}}
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                    <h3 class="text-lg font-bold text-gray-900">Active Projects Health</h3>
+                    <a href="{{ route('projects.index') }}" class="text-sm text-indigo-600 font-medium hover:text-indigo-800">View All Projects &rarr;</a>
+                </div>
+                <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style="min-width: 200px;">Progress (Actual vs. Planned)</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Budget vs. Actual (Rp)</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Financials</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             @forelse($activeProjects as $project)
                                 @php
                                     $isDelayed = $project->actual_progress < $project->planned_progress;
-                                    $isOverBudget = $project->cost_variance < 0; // Use the CV we already calculated
+                                    $isOverBudget = $project->cost_variance < 0;
                                 @endphp
-                                <tr>
-                                    <td class="px-4 py-3 whitespace-nowrap">
-                                        @if($project->isReadyForReport())
-                                            <a href="{{ route('reports.project_performance', $project) }}" class="transition duration-150">
-                                        @else
-                                            <a href="{{ route('projects.show', $project) }}" class="transition duration-150" title="Go to Project Details (Report Not Ready)">
-                                        @endif
-                                            <div class="text-sm font-medium text-gray-900 group-hover:text-indigo-600">{{ $project->quotation->project_name }}</div>
-                                            <div class="text-xs text-gray-500">{{ $project->project_code }}</div>
-                                        </a>
-                                    </td>
-                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ $project->client->name }}</td>
-                                    <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                        <div class="w-full bg-gray-200 rounded-full h-2.5 relative">
-                                            {{-- Planned progress marker --}}
-                                            @if($project->planned_progress > 0)
-                                            <div class="absolute h-4 w-1 bg-red-500 -top-1 rounded" 
-                                                 style="left: calc({{ $project->planned_progress }}% - 2px);" 
-                                                 title="Planned: {{ number_format($project->planned_progress, 1) }}%">
-                                            </div>
-                                            @endif
-                                            {{-- Actual progress bar --}}
-                                            <div class="bg-indigo-600 h-2.5 rounded-full" 
-                                                 style="width: {{ $project->actual_progress }}%"
-                                                 title="Actual: {{ number_format($project->actual_progress, 1) }}%">
+                                <tr class="hover:bg-gray-50 transition cursor-pointer group" onclick="window.location='{{ route('reports.project_performance', $project) }}'">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="ml-0">
+                                                <div class="text-sm font-medium text-gray-900 group-hover:text-indigo-600 transition">{{ $project->quotation->project_name }}</div>
+                                                <div class="text-xs text-gray-500">{{ $project->client->name }}</div>
                                             </div>
                                         </div>
-                                        <div class="text-xs font-semibold text-indigo-600 text-right mt-1">
-                                            {{ number_format($project->actual_progress, 1) }}%
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="w-32">
+                                            <div class="flex justify-between text-xs mb-1">
+                                                <span class="font-medium text-gray-700">{{ number_format($project->actual_progress, 1) }}%</span>
+                                                <span class="text-gray-500">Target: {{ number_format($project->planned_progress, 1) }}%</span>
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-1.5">
+                                                <div class="bg-indigo-600 h-1.5 rounded-full" style="width: {{ $project->actual_progress }}%"></div>
+                                            </div>
                                         </div>
                                     </td>
-                                    <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                        <div class="font-medium {{ $isOverBudget ? 'text-red-600' : 'text-gray-900' }}">
-                                            {{ number_format($project->actual_cost, 0) }}
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900 font-medium">
+                                            {!! formatCurrencyKPI($project->cost_variance) !!}
                                         </div>
-                                        <div class="text-xs text-gray-500">
-                                            / {{ number_format($project->total_budget, 0) }}
-                                        </div>
+                                        <div class="text-xs text-gray-500">Variance</div>
                                     </td>
-                                    <td class="px-4 py-3 whitespace-nowrap text-sm">
-                                        @if($isDelayed && $project->planned_progress > $project->actual_progress)
-                                            <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        @if($isDelayed)
+                                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
                                                 Delayed
                                             </span>
+                                        @elseif($isOverBudget)
+                                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                                Over Budget
+                                            </span>
                                         @else
-                                            <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                                                 On Track
                                             </span>
                                         @endif
@@ -97,7 +294,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="px-4 py-4 text-center text-sm text-gray-500">No active projects found.</td>
+                                    <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">No active projects found.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -105,147 +302,6 @@
                 </div>
             </div>
 
-            {{-- 1. Premium KPI Cards [MODIFIED] --}}
-            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6">
-                
-                {{-- Column 1: Cost Performance (NEW) --}}
-                <a href="{{ route('projects.index') }}" 
-                   class="bg-white p-6 rounded-xl shadow-lg border border-gray-100 space-y-4 block hover:shadow-xl hover:-translate-y-1 transition-all duration-200">
-                    <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Cost Performance</h4>
-                    <div class="flex items-baseline space-x-3">
-                        <dd class="text-4xl font-semibold {{ $totalCostVariance >= 0 ? 'text-green-600' : 'text-red-600' }} tracking-tight">
-                            {!! formatCurrencyKPI($totalCostVariance) !!}
-                        </dd>
-                        <dt class="font-medium text-gray-700">Total Cost Variance</dt>
-                    </div>
-                    <div class="flex items-baseline space-x-3">
-                        <dd class="text-4xl font-semibold {{ $totalCpi >= 1 ? 'text-green-600' : 'text-red-600' }} tracking-tight">
-                            {{ number_format($totalCpi, 2) }}
-                        </dd>
-                        <dt class="font-medium text-gray-700">Cost Perf. Index (CPI)</dt>
-                    </div>
-                    <p class="text-xs text-gray-500">
-                        @if($totalCpi >= 1)
-                            For every Rp1 spent, you are earning Rp{{ number_format($totalCpi, 2) }} of value.
-                        @else
-                            For every Rp1 spent, you are only earning Rp{{ number_format($totalCpi, 2) }} of value.
-                        @endif
-                    </p>
-                </a>
-
-                {{-- Column 2: Financials (Clickable) --}}
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100 space-y-4">
-                    <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Financials</h4>
-                    <a href="{{ route('projects.index') }}" 
-                       class="flex items-baseline space-x-3 group hover:opacity-70 transition-opacity">
-                        <dd class="text-4xl font-semibold text-blue-600 tracking-tight">
-                            {!! formatCurrencyKPI($totalActiveProjectValue) !!}
-                        </dd>
-                        <dt class="font-medium text-gray-700 group-hover:underline">Value of Active Projects</dt>
-                    </a>
-                    <a href="{{ route('invoices.index') }}" 
-                       class="flex items-baseline space-x-3 group hover:opacity-70 transition-opacity">
-                        <dd class="text-4xl font-semibold text-yellow-600 tracking-tight">
-                            {!! formatCurrencyKPI($outstandingInvoices) !!}
-                        </dd>
-                        <dt class="font-medium text-gray-700 group-hover:underline">Outstanding Invoices</dt>
-                    </a>
-                </div>
-
-                {{-- Column 3: Operations (Not Clickable) --}}
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100 space-y-4">
-                    <h4 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Operations</h4>
-                    <div class="flex items-baseline space-x-3">
-                        <dd class="text-4xl font-semibold text-red-600 tracking-tight">{{ $pendingRequests->count() }}</dd>
-                        <dt class="font-medium text-gray-700">Pending Material Requests</dt>
-                    </div>
-                    <div class="flex items-baseline space-x-3">
-                        <dd class="text-4xl font-semibold text-yellow-600 tracking-tight">{{ $procurementBacklogCount }}</dd>
-                        <dt class="font-medium text-gray-700">Procurement Backlog</dt>
-                    </div>
-                    <div class="flex items-baseline space-x-3">
-                        <dd class="text-4xl font-semibold text-orange-600 tracking-tight">{{ $latePurchaseOrders->count() }}</dd>
-                        <dt class="font-medium text-gray-700">Late POs</dt>
-                    </div>
-                </div>
-
-            </div>
-
-            {{-- 2. New Chart: Cost Variance by Project --}}
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Project Profit/Loss (Cost Variance)</h3>
-                    <p class="text-sm text-gray-600 -mt-4 mb-4">Positive (Green) is profit. Negative (Red) is loss.</p>
-                    <div class="h-64">
-                        <canvas id="costVarianceChart"></canvas>
-                    </div>
-                </div>
-
-                {{-- 3. Financial Chart --}}
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">6-Month Cash Flow (Invoiced vs. Paid)</h3>
-                    <div class="h-64">
-                        <canvas id="cashFlowChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            {{-- 4. Action Item Lists --}}
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                
-                {{-- Pending Material Requests List --}}
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col" style="max-height: 400px;">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Action Required: Material Requests</h3>
-                    <div class="flex-1 overflow-y-auto">
-                        <ul class="divide-y divide-gray-200">
-                            @forelse($pendingRequests as $request)
-                                <li class="p-3 hover:bg-gray-50 transition duration-150">
-                                    <a href="{{ route('material-requests.show', $request) }}" class="block">
-                                        <div class="flex justify-between items-center">
-                                            <span class="font-semibold text-indigo-700">{{ $request->request_code }}</span>
-                                            <span class="text-sm text-gray-500">{{ $request->request_date->format('d-M-Y') }}</span>
-                                        </div>
-                                        <p class="text-sm text-gray-800 mt-1">{{ $request->project->quotation->project_name }}</p>
-                                        <p class="text-xs text-gray-500">Requested by {{ $request->requester->name }}</p>
-                                    </a>
-                                </li>
-                            @empty
-                                <li class="p-4 text-sm text-gray-500 text-center">
-                                    No pending material requests. Good job!
-                                </li>
-                            @endforelse
-                        </ul>
-                    </div>
-                </div>
-
-                {{-- Late Purchase Orders List --}}
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col" style="max-height: 400px;">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">At Risk: Late Purchase Orders</h3>
-                    <div class="flex-1 overflow-y-auto">
-                        <ul class="divide-y divide-gray-200">
-                            @forelse($latePurchaseOrders as $po)
-                                <li class="p-3 hover:bg-gray-50 transition duration-150">
-                                    <a href="{{ route('purchase-orders.show', $po) }}" class="block">
-                                        <div class="flex justify-between items-center">
-                                            <span class="font-semibold text-red-600">{{ $po->po_number }}</span>
-                                            <span class="text-sm text-red-600 font-medium">
-                                                Due: {{ $po->expected_delivery_date->format('d-M-Y') }}
-                                            </span>
-                                        </div>
-                                        <p class="text-sm text-gray-800 mt-1">Supplier: {{ $po->supplier->name }}</p>
-                                    </a>
-                                </li>
-                            @empty
-                                <li class="p-4 text-sm text-gray-500 text-center">
-                                    No late purchase orders.
-                                </li>
-                            @endforelse
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            
         </div>
     </div>
 
@@ -269,9 +325,22 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    scales: { y: { beginAtZero: true, ticks: { callback: (value) => formatAsIDR(value) } }, x: { grid: { display: false } } },
+                    scales: { 
+                        y: { 
+                            beginAtZero: true, 
+                            ticks: { callback: (value) => formatAsIDR(value) },
+                            grid: { borderDash: [2, 4], color: '#f3f4f6' }
+                        }, 
+                        x: { 
+                            grid: { display: false } 
+                        } 
+                    },
                     plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } },
                         tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            cornerRadius: 8,
                             callbacks: {
                                 label: (context) => `${context.dataset.label || ''}: ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(context.parsed.y)}`
                             }
@@ -290,26 +359,23 @@
                     datasets: [{
                         label: 'Cost Variance (Profit/Loss)',
                         data: cvData.data,
-                        // Dynamic coloring: red for loss, green for profit
                         backgroundColor: (context) => {
                             const value = context.raw;
-                            return value < 0 ? 'rgba(220, 38, 38, 0.8)' : 'rgba(5, 150, 105, 0.8)';
+                            return value < 0 ? 'rgba(239, 68, 68, 0.8)' : 'rgba(16, 185, 129, 0.8)';
                         },
-                        borderColor: (context) => {
-                            const value = context.raw;
-                            return value < 0 ? 'rgba(220, 38, 38, 1)' : 'rgba(5, 150, 105, 1)';
-                        },
-                        borderWidth: 1
+                        borderRadius: 4,
+                        barThickness: 20,
                     }]
                 },
                 options: {
-                    indexAxis: 'y', // Makes it a horizontal bar chart
+                    indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: { 
                         x: { 
                             beginAtZero: true, 
-                            ticks: { callback: (value) => formatAsIDR(value) } 
+                            ticks: { callback: (value) => formatAsIDR(value) },
+                            grid: { borderDash: [2, 4], color: '#f3f4f6' }
                         },
                         y: { 
                             grid: { display: false } 
@@ -318,6 +384,9 @@
                     plugins: {
                         legend: { display: false },
                         tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            cornerRadius: 8,
                             callbacks: {
                                 label: (context) => `Cost Variance: ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(context.parsed.x)}`
                             }

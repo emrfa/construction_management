@@ -39,6 +39,20 @@ class DashboardController extends Controller
             ->get()
             ->sum('remaining_balance');
         
+        // [NEW] Trend for Outstanding Invoices (vs Last Month)
+        $lastMonthStart = now()->subMonth()->startOfMonth();
+        $lastMonthEnd = now()->subMonth()->endOfMonth();
+        $outstandingLastMonth = Invoice::whereIn('status', ['sent', 'partially_paid', 'overdue'])
+            ->whereBetween('issued_date', [$lastMonthStart, $lastMonthEnd])
+            ->get()
+            ->sum('remaining_balance');
+        
+        // Avoid division by zero
+        $outstandingTrend = 0;
+        if ($outstandingLastMonth > 0) {
+            $outstandingTrend = (($outstandingInvoices - $outstandingLastMonth) / $outstandingLastMonth) * 100;
+        }
+
         $totalActiveProjectValue = Project::whereIn('status', ['initiated', 'in_progress'])
                                      ->sum('total_budget');
 
@@ -72,7 +86,8 @@ class DashboardController extends Controller
                 'quotation.allItems.progressUpdates', // Eager load all WBS items and their progress
                 'quotation.allItems.progressUpdates.materialUsages', 
                 'quotation.allItems.progressUpdates.laborUsages', 
-                'quotation.allItems.progressUpdates.equipmentUsages'
+                'quotation.allItems.progressUpdates.equipmentUsages',
+                'client'
             ])
             ->whereIn('status', ['initiated', 'in_progress'])
             ->get();
@@ -85,6 +100,10 @@ class DashboardController extends Controller
         $totalActualCost = 0;
         $costVarianceChartData = ['labels' => [], 'data' => []];
 
+        // Risk Counters
+        $projectsOverBudgetCount = 0;
+        $projectsDelayedCount = 0;
+
         foreach ($activeProjects as $project) {
             
             // [FIXED] Calculate Actual Progress using the CORRECT weighted average
@@ -96,12 +115,18 @@ class DashboardController extends Controller
             // Check Schedule
             if ($project->actual_progress >= $project->planned_progress - 0.01) {
                 $projectsOnTrackCount++;
+            } else {
+                $projectsDelayedCount++;
             }
             
             // Calculate EV, AC, and CV for each project
             $project->actual_cost = $project->quotation->allItems->sum('actual_cost'); // Summing accessor is fine
             $project->earned_value = (float)$project->total_budget * ($project->actual_progress / 100);
             $project->cost_variance = $project->earned_value - $project->actual_cost;
+
+            if ($project->cost_variance < 0) {
+                $projectsOverBudgetCount++;
+            }
 
             // Add to totals
             $totalEarnedValue += $project->earned_value;
@@ -115,6 +140,17 @@ class DashboardController extends Controller
 
         $totalCpi = ($totalActualCost > 0) ? $totalEarnedValue / $totalActualCost : 1;
 
+        // [NEW] Top 5 Projects by Profit (CV)
+        $topProjectsByProfit = $activeProjects->sortByDesc('cost_variance')->take(5);
+        
+        // [NEW] Top 5 Projects by Loss (CV) - actually bottom 5
+        $topProjectsByLoss = $activeProjects->sortBy('cost_variance')->take(5);
+
+        // [NEW] Overdue Invoices Count/Sum
+        $overdueInvoicesCount = Invoice::where('status', 'overdue')->count();
+        // FIX: remaining_balance is an accessor, so we must fetch the collection first
+        $overdueInvoicesSum = Invoice::where('status', 'overdue')->get()->sum('remaining_balance');
+
         return view('dashboard', [
             'activeProjectsCount' => $activeProjectsCount,
             'projectsOnTrackCount' => $projectsOnTrackCount,
@@ -123,6 +159,8 @@ class DashboardController extends Controller
             'totalCpi' => $totalCpi,
 
             'outstandingInvoices' => $outstandingInvoices,
+            'outstandingTrend' => $outstandingTrend,
+            
             'totalActiveProjectValue' => $totalActiveProjectValue,
             'procurementBacklogCount' => $procurementBacklogCount,
 
@@ -131,7 +169,15 @@ class DashboardController extends Controller
             
             'pendingRequests' => $pendingRequests,
             'latePurchaseOrders' => $latePurchaseOrders,
-            'activeProjects' => $activeProjects,
+            'activeProjects' => $activeProjects->take(5), // Limit table to top 5
+            
+            // New Variables
+            'projectsOverBudgetCount' => $projectsOverBudgetCount,
+            'projectsDelayedCount' => $projectsDelayedCount,
+            'topProjectsByProfit' => $topProjectsByProfit,
+            'topProjectsByLoss' => $topProjectsByLoss,
+            'overdueInvoicesCount' => $overdueInvoicesCount,
+            'overdueInvoicesSum' => $overdueInvoicesSum,
         ]);
     }
 

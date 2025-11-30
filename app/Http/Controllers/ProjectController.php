@@ -17,9 +17,10 @@ class ProjectController extends Controller
     public function index(Request $request)
     {
         // Start query
-        $query = Project::with(['client', 'quotation'])->latest();
+        $query = Project::with(['client', 'quotation', 'quotation.allItems.progressUpdates'])
+            ->latest();
 
-        // **NEW**: Apply search logic
+        // Apply search logic
         $query->when($request->search, function ($q, $search) {
             return $q->where('project_code', 'like', "%{$search}%")
                      ->orWhereHas('quotation', function ($subQuery) use ($search) {
@@ -29,11 +30,105 @@ class ProjectController extends Controller
                          $subQuery->where('name', 'like', "%{$search}%");
                      });
         });
-        
-        // [MODIFIED] Paginate the query
-        $projects = $query->paginate(15)->appends($request->query());
+
+        // [NEW] Handle Risk Filters (requires calculation)
+        if ($request->has('filter')) {
+            // We must fetch all to calculate metrics, then filter
+            // Note: This might be heavy if there are thousands of projects, 
+            // but for a typical construction firm with < 100 active projects, it's fine.
+            $projectsCollection = $query->get();
+            
+            // Helper to calculate metrics (duplicated from Dashboard - ideally move to Service/Trait)
+            $projectsCollection->each(function($project) {
+                // We need these for filtering
+                $project->actual_progress = $this->getWbsActualProgress($project);
+                $project->planned_progress = $this->getWbsPlannedProgress($project);
+                
+                $project->actual_cost = $project->quotation->allItems->sum('actual_cost');
+                $project->earned_value = (float)$project->total_budget * ($project->actual_progress / 100);
+                $project->cost_variance = $project->earned_value - $project->actual_cost;
+            });
+
+            if ($request->filter === 'over_budget') {
+                $projectsCollection = $projectsCollection->filter(function ($project) {
+                    return $project->cost_variance < 0 && ($project->status == 'initiated' || $project->status == 'in_progress');
+                });
+            } elseif ($request->filter === 'delayed') {
+                $projectsCollection = $projectsCollection->filter(function ($project) {
+                    return $project->actual_progress < $project->planned_progress && ($project->status == 'initiated' || $project->status == 'in_progress');
+                });
+            }
+
+            // Manual Pagination
+            $page = $request->get('page', 1);
+            $perPage = 15;
+            $projects = new \Illuminate\Pagination\LengthAwarePaginator(
+                $projectsCollection->forPage($page, $perPage),
+                $projectsCollection->count(),
+                $perPage,
+                $page,
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
+
+        } else {
+            // Standard Pagination
+            $projects = $query->paginate(15)->appends($request->query());
+        }
 
         return view('projects.index', compact('projects'));
+    }
+
+    // [DUPLICATED HELPERS] - In a real refactor, move these to a ProjectService or Trait
+    private function getWbsActualProgress(Project $project): float
+    {
+        $totalBudget = (float) $project->total_budget;
+        if ($totalBudget == 0) return 0;
+
+        $tasks = $project->quotation->allItems->filter(fn($item) => $item->children->isEmpty());
+        $totalEarnedValue = 0;
+
+        foreach ($tasks as $task) {
+            $taskWeight = (float)$task->subtotal;
+            $taskProgress = (float)$task->latest_progress;
+            $totalEarnedValue += $taskWeight * ($taskProgress / 100);
+        }
+
+        return round(($totalEarnedValue / $totalBudget) * 100, 2);
+    }
+
+    private function getWbsPlannedProgress(Project $project): float
+    {
+        $totalBudget = (float) $project->total_budget;
+        if ($totalBudget == 0) return 0;
+
+        $project->loadMissing('quotation.allItems');
+        $tasks = $project->quotation->allItems->filter(fn($item) => $item->children->isEmpty());
+        $today = \Carbon\Carbon::today();
+        $totalPlannedValue = 0;
+
+        foreach ($tasks as $task) {
+            $taskWeight = (float)$task->subtotal;
+            $planned_start = $task->planned_start ? \Carbon\Carbon::parse($task->planned_start) : null;
+            $planned_end = $task->planned_end ? \Carbon\Carbon::parse($task->planned_end) : null;
+
+            if ($planned_start && $planned_end && $planned_start <= $today) {
+                if ($today >= $planned_end) {
+                    $totalPlannedValue += $taskWeight;
+                } else {
+                    $totalDuration = $planned_start->diffInDays($planned_end) + 1;
+                    $elapsedDuration = $planned_start->diffInDays($today) + 1;
+                    
+                    if ($totalDuration <= 0) {
+                         $totalPlannedValue += $taskWeight;
+                    } else {
+                        $taskPlannedProgress = ($elapsedDuration / $totalDuration);
+                        $totalPlannedValue += $taskWeight * $taskPlannedProgress;
+                    }
+                }
+            }
+        }
+        
+        return round(($totalPlannedValue / $totalBudget) * 100, 2);
     }
 
     /**

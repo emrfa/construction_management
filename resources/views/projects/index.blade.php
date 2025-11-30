@@ -35,6 +35,26 @@
                 </form>
             </div>
 
+            {{-- Filter Indicator --}}
+            @if(request('filter'))
+                <div class="bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded-r-lg flex justify-between items-center">
+                    <div class="flex items-center">
+                        <svg class="h-5 w-5 text-indigo-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                        </svg>
+                        <p class="text-indigo-700 font-medium">
+                            Showing: 
+                            @if(request('filter') == 'over_budget')
+                                <span class="font-bold">Over Budget Projects</span>
+                            @elseif(request('filter') == 'delayed')
+                                <span class="font-bold">Delayed Projects</span>
+                            @endif
+                        </p>
+                    </div>
+                    <a href="{{ route('projects.index') }}" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Clear Filter &times;</a>
+                </div>
+            @endif
+
             <div class="bg-white shadow-lg rounded-2xl overflow-hidden border border-gray-100">
                 <div class="overflow-x-auto">
                     <table class="min-w-full">
