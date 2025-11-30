@@ -40,7 +40,7 @@
     {{-- Quantity --}}
     <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
         @if(!$isParent)
-            {{ $item->quantity }}
+            {{ (float)$item->quantity }}
         @endif
     </td>
 

@@ -4,7 +4,7 @@
         {{ $item->description }}
     </td>
     <td class="col-unit">{{ $item->uom }}</td>
-    <td class="col-qty">{{ $item->quantity > 0 ? $item->quantity : '' }}</td>
+    <td class="col-qty">{{ $item->quantity > 0 ? (float)$item->quantity : '' }}</td>
     <td class="col-price">
         {{ $item->unit_price > 0 ? number_format($item->unit_price, 0, ',', '.') : '' }}
     </td>

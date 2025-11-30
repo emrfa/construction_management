@@ -110,13 +110,16 @@ class QuotationController extends Controller
     public function show(Quotation $quotation)
     {
         $quotation->load([
-        'client', 
-        'items.children', 
-        'activities' => fn($query) => $query->latest(), 
-        'activities.causer'
-    ]);
+            'client', 
+            'items.children', 
+            'activities' => fn($query) => $query->latest(), 
+            'activities.causer'
+        ]);
 
-        return view('quotations.show', compact('quotation'));
+        // [UPDATED] Get Original Contract Items only
+        $originalItems = $this->getOriginalContractItems($quotation);
+
+        return view('quotations.show', compact('quotation', 'originalItems'));
     }
 
     public function exportPdf(Quotation $quotation)
@@ -124,10 +127,10 @@ class QuotationController extends Controller
         // Load all items with their children
         $quotation->load(['client', 'items.children']);
         
-        // Get root items for the view
-        $rootItems = $quotation->items->whereNull('parent_id')->sortBy('sort_order');
+        // [UPDATED] Get Original Contract Items only
+        $rootItems = $this->getOriginalContractItems($quotation);
         
-        // Use the current total estimate
+        // Use the current total estimate (which is now preserved as Original Total)
         $grandTotal = $quotation->total_estimate;
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('quotations.pdf', compact('quotation', 'rootItems', 'grandTotal'));
@@ -136,6 +139,51 @@ class QuotationController extends Controller
         $pdf->setPaper('a4', 'portrait');
         
         return $pdf->download('Quotation-' . $quotation->quotation_no . '.pdf');
+    }
+
+    /**
+     * Helper to get Original Contract Items (Reverting Adendums)
+     */
+    private function getOriginalContractItems(Quotation $quotation)
+    {
+        // 1. Get ALL items (flat) to ensure we have the full tree
+        $allItems = $quotation->allItems; 
+
+        // 2. Filter out New Work from Adendums
+        $filteredItems = $allItems->filter(function ($item) {
+            return $item->adendum_id === null;
+        });
+
+        // 3. Revert Modified Items to Original Quantity
+        // We clone the items to avoid mutating the actual loaded relationship models if they are used elsewhere
+        $processedItems = $filteredItems->map(function ($item) {
+            // Clone to avoid side effects
+            $item = clone $item;
+            
+            if (!is_null($item->original_quantity)) {
+                $item->quantity = $item->original_quantity;
+                $item->subtotal = $item->original_subtotal;
+            }
+            return $item;
+        });
+
+        // 4. Build Tree
+        $tree = $this->buildTreeFromCollection($processedItems);
+        
+        // 5. Recalculate Subtotals (Rollup) to ensure consistency
+        $this->recalculateTreeSubtotals($tree);
+
+        return $tree;
+    }
+
+    private function recalculateTreeSubtotals($items)
+    {
+        foreach ($items as $item) {
+            if ($item->children && $item->children->isNotEmpty()) {
+                $this->recalculateTreeSubtotals($item->children);
+                $item->subtotal = $item->children->sum('subtotal');
+            }
+        }
     }
 
     /**

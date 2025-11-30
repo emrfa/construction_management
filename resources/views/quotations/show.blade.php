@@ -133,7 +133,7 @@
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
-                                @foreach ($quotation->items as $item)
+                                @foreach ($originalItems as $item)
                                     @include('quotations.partials.item-row', ['item' => $item, 'level' => 0])
                                 @endforeach
                             </tbody>

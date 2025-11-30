@@ -143,6 +143,9 @@ class AdendumController extends Controller
                         $originalItem->subtotal = $originalItem->quantity * $originalItem->unit_price;
                         $originalItem->save();
 
+                        // [FIX] Update Parent Subtotals (Rollup)
+                        $this->updateParentSubtotals($originalItem);
+
                         // Auto-adjust Progress if there was progress
                         if ($currentProgress > 0 && $originalItem->quantity > 0) {
                             $newProgress = ($executedQty / $originalItem->quantity) * 100;
@@ -176,9 +179,9 @@ class AdendumController extends Controller
                 }
             }
 
-            // 3. Update Quotation Total
+            // 3. Update Quotation Total - REMOVED to keep Quotation as Original Contract
             $newTotal = $project->quotation->items()->sum('subtotal');
-            $project->quotation->update(['total_estimate' => $newTotal]);
+            // $project->quotation->update(['total_estimate' => $newTotal]);
 
             // 4. Update Project Budget
             $project->update(['total_budget' => $newTotal]);
@@ -188,5 +191,23 @@ class AdendumController extends Controller
         });
 
         return back()->with('success', 'Adendum approved. WBS updated with Revised Quantities.');
+    }
+
+    /**
+     * Recursively update parent subtotals.
+     */
+    private function updateParentSubtotals($item)
+    {
+        if ($item->parent_id) {
+            $parent = $item->parent;
+            if ($parent) {
+                // Recalculate parent subtotal from its children
+                $parent->subtotal = $parent->children()->sum('subtotal');
+                $parent->save();
+
+                // Recurse up
+                $this->updateParentSubtotals($parent);
+            }
+        }
     }
 }
