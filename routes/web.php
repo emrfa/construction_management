@@ -63,6 +63,7 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('clients', ClientController::class);
     Route::resource('quotations', QuotationController::class);
+    Route::get('/quotations/{quotation}/export', [QuotationController::class, 'exportPdf'])->name('quotations.export');
     Route::post('/quotations/{quotation}/status', [QuotationController::class, 'updateStatus'])
      ->name('quotations.updateStatus');
 

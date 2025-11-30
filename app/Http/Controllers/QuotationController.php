@@ -119,6 +119,47 @@ class QuotationController extends Controller
         return view('quotations.show', compact('quotation'));
     }
 
+    public function exportPdf(Quotation $quotation)
+    {
+        // Load all items with their children
+        $quotation->load(['client', 'items.children']);
+        
+        // Get root items for the view
+        $rootItems = $quotation->items->whereNull('parent_id')->sortBy('sort_order');
+        
+        // Use the current total estimate
+        $grandTotal = $quotation->total_estimate;
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('quotations.pdf', compact('quotation', 'rootItems', 'grandTotal'));
+        
+        // Set paper to A4
+        $pdf->setPaper('a4', 'portrait');
+        
+        return $pdf->download('Quotation-' . $quotation->quotation_no . '.pdf');
+    }
+
+    /**
+     * Helper to build tree from a flat collection of items.
+     */
+    private function buildTreeFromCollection($items, $parentId = null)
+    {
+        $branch = collect();
+
+        foreach ($items as $item) {
+            if ($item->parent_id == $parentId) {
+                $children = $this->buildTreeFromCollection($items, $item->id);
+                if ($children->isNotEmpty()) {
+                    $item->setRelation('children', $children);
+                } else {
+                    $item->setRelation('children', collect());
+                }
+                $branch->push($item);
+            }
+        }
+
+        return $branch;
+    }
+
     /**
      * Store a newly created resource in storage.
      */

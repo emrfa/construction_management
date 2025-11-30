@@ -429,7 +429,27 @@
     </div>
 
     @push('head-scripts')
+    <style>
+        /* Chrome, Safari, Edge, Opera */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+        }
+
+        /* Firefox */
+        input[type=number] {
+        -moz-appearance: textfield;
+        }
+    </style>
     <script>
+         document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('input[type=number]').forEach(input => {
+            input.addEventListener('wheel', (e) => {
+                e.preventDefault();
+            });
+        });
+    });
     window.rabBuilder = function(ahsLibraryData, workTypesLibrary, oldItems, workItemsLibrary) {
         return {
             items: oldItems || [],
