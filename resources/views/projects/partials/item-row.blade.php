@@ -6,7 +6,7 @@
     $itemBudgetLeft = $item->budget_left;
 @endphp
 
-<div class="grid grid-cols-12 gap-1 items-center py-1 border-b @if($isParent) bg-gray-50 @endif text-xs">
+<div class="grid grid-cols-12 gap-1 items-center py-1 border-b @if($isParent) bg-gray-50 @else hover:bg-blue-50/30 @endif text-xs transition-colors">
 
     {{-- Description --}}
     <div class="col-span-3" style="padding-left: {{ $padding }};">
@@ -14,9 +14,21 @@
     </div>
 
     {{-- Code --}}
-    <div class="col-span-1">{{ $item->item_code }}</div>
+    <div class="col-span-1">
+        @if(!$isParent)
+            <button type="button" 
+                    onclick="openTaskDrillDown({{ $item->id }})"
+                    class="text-indigo-600 hover:text-indigo-900 hover:underline font-medium cursor-pointer text-left"
+                    title="Click to see details">
+                {{ $item->item_code ?? 'View →' }}
+            </button>
+        @else
+            {{ $item->item_code }}
+        @endif
+    </div>
 
     {{-- UOM --}}
+
     <div class="col-span-1">{{ $item->uom }}</div>
 
     {{-- Original Qty --}}

@@ -151,6 +151,30 @@ class DashboardController extends Controller
         // FIX: remaining_balance is an accessor, so we must fetch the collection first
         $overdueInvoicesSum = Invoice::where('status', 'overdue')->get()->sum('remaining_balance');
 
+        // === 5. Net Profit Trend (Historical CV) ===
+        $lastMonthDate = now()->subDays(30);
+        $totalCostVarianceLastMonth = 0;
+
+        // We need to calculate CV for EACH active project as it was 30 days ago
+        // This is an approximation assuming the same projects were active. 
+        // For higher accuracy, we should check project status history, but this is acceptable for a trend indicator.
+        foreach ($activeProjects as $project) {
+            $actualProgressLastMonth = $this->getWbsActualProgressAtDate($project, $lastMonthDate);
+            $earnedValueLastMonth = (float)$project->total_budget * ($actualProgressLastMonth / 100);
+            $actualCostLastMonth = $this->getProjectActualCostAtDate($project, $lastMonthDate);
+            
+            $cvLastMonth = $earnedValueLastMonth - $actualCostLastMonth;
+            $totalCostVarianceLastMonth += $cvLastMonth;
+        }
+
+        $netProfitTrend = 0;
+        // Avoid division by zero and handle sign flips
+        if ($totalCostVarianceLastMonth != 0) {
+            $netProfitTrend = (($totalCostVariance - $totalCostVarianceLastMonth) / abs($totalCostVarianceLastMonth)) * 100;
+        } elseif ($totalCostVariance != 0) {
+            $netProfitTrend = 100; // From 0 to something is 100% growth
+        }
+
         return view('dashboard', [
             'activeProjectsCount' => $activeProjectsCount,
             'projectsOnTrackCount' => $projectsOnTrackCount,
@@ -178,9 +202,57 @@ class DashboardController extends Controller
             'topProjectsByLoss' => $topProjectsByLoss,
             'overdueInvoicesCount' => $overdueInvoicesCount,
             'overdueInvoicesSum' => $overdueInvoicesSum,
+            'netProfitTrend' => $netProfitTrend,
         ]);
     }
 
+    // [NEW] Helper to get Actual Progress at a specific date
+    private function getWbsActualProgressAtDate($project, $date): float
+    {
+        $totalBudget = (float) $project->total_budget;
+        if ($totalBudget == 0) return 0;
+
+        $tasks = $project->quotation->allItems->filter(fn($item) => $item->children->isEmpty());
+        $totalEarnedValue = 0;
+
+        foreach ($tasks as $task) {
+            $taskWeight = (float)$task->subtotal;
+            
+            // Find the latest progress update ON or BEFORE the date
+            $latestUpdate = $task->progressUpdates
+                ->where('date', '<=', $date)
+                ->sortByDesc('date')
+                ->first();
+
+            $taskProgress = $latestUpdate ? (float)$latestUpdate->percent_complete : 0;
+            $totalEarnedValue += $taskWeight * ($taskProgress / 100);
+        }
+
+        return round(($totalEarnedValue / $totalBudget) * 100, 2);
+    }
+
+    // [NEW] Helper to get Actual Cost at a specific date
+    private function getProjectActualCostAtDate($project, $date): float
+    {
+        $totalActualCost = 0;
+        $tasks = $project->quotation->allItems->filter(fn($item) => $item->children->isEmpty());
+
+        foreach ($tasks as $task) {
+            // Filter updates on or before date
+            $updates = $task->progressUpdates->where('date', '<=', $date);
+            
+            foreach ($updates as $update) {
+                // Sum usages for this update
+                $materialCost = $update->materialUsages->sum(fn($u) => $u->quantity_used * $u->unit_cost);
+                $laborCost = $update->laborUsages->sum(fn($u) => $u->quantity_used * $u->unit_cost);
+                $equipmentCost = $update->equipmentUsages->sum('total_cost');
+                
+                $totalActualCost += ($materialCost + $laborCost + $equipmentCost);
+            }
+        }
+
+        return $totalActualCost;
+    }
     /**
      * [NEW] Calculates the "Akumulasi Actual" using a budget-weighted average.
      */

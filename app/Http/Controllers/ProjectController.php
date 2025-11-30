@@ -284,4 +284,190 @@ class ProjectController extends Controller
         // 4. Redirect back with success
         return redirect()->route('projects.show', $project)->with('success', 'Project schedule updated successfully.');
     }
+
+    /**
+     * Get detailed drill-down data for a quotation item (AJAX endpoint)
+     */
+    public function getTaskDrillDown(QuotationItem $item)
+    {
+        try {
+            // Use fresh queries instead of eager loading - more reliable for deeply nested relationships
+            
+            // Get progress updates with all nested data
+            $progressUpdates = \App\Models\ProgressUpdate::where('quotation_item_id', $item->id)
+                ->with([
+                    'user',
+                    'materialUsages.inventoryItem',
+                    'laborUsages.labor',
+                    'equipmentUsages.equipment'
+                ])
+                ->orderBy('date', 'desc')
+                ->get();
+            
+            // Get AHS with all nested data
+            $ahs = null;
+            if ($item->unit_rate_analysis_id) {
+                $ahs = \App\Models\UnitRateAnalysis::with([
+                    'materials.inventoryItem',
+                    'labors.labor',
+                    'equipments.equipment'
+                ])->find($item->unit_rate_analysis_id);
+            }
+
+            // Calculate cost breakdown
+            $budgetedCost = [
+                'materials' => 0,
+                'labor' => 0,
+                'equipment' => 0,
+                'total' => (float) ($item->subtotal ?? 0)
+            ];
+
+            $actualCost = [
+                'materials' => 0,
+                'labor' => 0,
+                'equipment' => 0,
+                'total' => (float) ($item->actual_cost ?? 0)
+            ];
+
+            // Get budgeted breakdown from AHS (with null checks)
+            if ($ahs && $ahs->materials) {
+                $budgetedCost['materials'] = $ahs->materials->sum(function ($material) use ($item) {
+                    return ($material->coefficient ?? 0) * ($material->unit_cost ?? 0) * ($item->quantity ?? 0);
+                });
+            }
+            
+            if ($ahs && $ahs->labors) {
+                $budgetedCost['labor'] = $ahs->labors->sum(function ($labor) use ($item) {
+                    return ($labor->coefficient ?? 0) * ($labor->labor->rate ?? 0) * ($item->quantity ?? 0);
+                });
+            }
+            
+            if ($ahs && $ahs->equipments) {
+                $budgetedCost['equipment'] = $ahs->equipments->sum(function ($equipment) use ($item) {
+                    return ($equipment->coefficient ?? 0) * ($equipment->equipment->base_rental_rate ?? 0) * ($item->quantity ?? 0);
+                });
+            }
+
+            // Get actual costs from progress updates
+            if ($progressUpdates->isNotEmpty()) {
+                foreach ($progressUpdates as $update) {
+                    if ($update->materialUsages) {
+                        $actualCost['materials'] += $update->materialUsages->sum(function ($usage) {
+                            return ($usage->quantity_used ?? 0) * ($usage->unit_cost ?? 0);
+                        });
+                    }
+                    
+                    if ($update->laborUsages) {
+                        $actualCost['labor'] += $update->laborUsages->sum(function ($usage) {
+                            return ($usage->hours_used ?? 0) * ($usage->labor->rate ?? 0);
+                        });
+                    }
+                    
+                    if ($update->equipmentUsages) {
+                        $actualCost['equipment'] += $update->equipmentUsages->sum(function ($usage) {
+                            return ($usage->hours_used ?? 0) * ($usage->equipment->base_rental_rate ?? 0);
+                        });
+                    }
+                }
+            }
+
+            // Progress history data
+            $progressHistory = $progressUpdates->sortBy('date')->map(function ($update) {
+                return [
+                    'date' => $update->date,
+                    'progress' => (float) ($update->percent_complete ?? 0),
+                    'user' => $update->user->name ?? 'Unknown',
+                    'notes' => $update->notes ?? ''
+                ];
+            });
+
+            // Recent updates with full details
+            $recentUpdates = $progressUpdates->take(5)->map(function ($update) {
+                return [
+                    'id' => $update->id,
+                    'date' => $update->date,
+                    'progress' => (float) ($update->percent_complete ?? 0),
+                    'user' => $update->user->name ?? 'Unknown',
+                    'notes' => $update->notes ?? '',
+                    'materials_used' => $update->materialUsages ? $update->materialUsages->map(function ($usage) {
+                        $itemName = 'Unknown';
+                        $itemUom = '-';
+                        $standardCost = 0;
+                        
+                        // Try to get inventory item details with better error handling
+                        if ($usage->inventoryItem) {
+                            $itemName = $usage->inventoryItem->item_name ?? 'Unknown Item';
+                            $itemUom = $usage->inventoryItem->uom ?? '-';
+                            $standardCost = $usage->unit_cost ?? 0;  // Cost is stored on the usage record!
+                        }
+                        
+                        return [
+                            'item' => $itemName,
+                            'quantity' => $usage->quantity_used ?? 0,
+                            'uom' => $itemUom,
+                            'cost' => ($usage->quantity_used ?? 0) * $standardCost
+                        ];
+                    }) : collect([]),
+                    'labor_used' => $update->laborUsages ? $update->laborUsages->map(function ($usage) {
+                        return [
+                            'type' => $usage->labor->labor_type ?? 'Unknown',
+                            'hours' => $usage->hours_used ?? 0,
+                            'cost' => ($usage->hours_used ?? 0) * ($usage->labor->rate ?? 0)
+                        ];
+                    }) : collect([]),
+                    'equipment_used' => $update->equipmentUsages ? $update->equipmentUsages->map(function ($usage) {
+                        return [
+                            'type' => $usage->equipment->name ?? 'Unknown',
+                            'hours' => $usage->hours_used ?? 0,
+                            'cost' => ($usage->hours_used ?? 0) * ($usage->equipment->base_rental_rate ?? 0)
+                        ];
+                    }) : collect([])
+                ];
+            });
+
+            return response()->json([
+                'task' => [
+                    'id' => $item->id,
+                    'code' => $item->item_code ?? 'N/A',
+                    'description' => $item->description ?? 'Unnamed Task',
+                    'uom' => $item->uom ?? '-',
+                    'quantity' => (float) ($item->quantity ?? 0),
+                    'unit_price' => (float) ($item->unit_price ?? 0),
+                    'progress' => (float) ($item->latest_progress ?? 0)
+                ],
+                'budget' => $budgetedCost,
+                'actual' => $actualCost,
+                'variance' => [
+                    'materials' => $budgetedCost['materials'] - $actualCost['materials'],
+                    'labor' => $budgetedCost['labor'] - $actualCost['labor'],
+                    'equipment' => $budgetedCost['equipment'] - $actualCost['equipment'],
+                    'total' => $budgetedCost['total'] - $actualCost['total']
+                ],
+                'progress_history' => $progressHistory,
+                'recent_updates' => $recentUpdates
+            ]);
+
+        } catch (\Exception $e) {
+            // Log the error for debugging
+            \Log::error('Task drill-down error: ' . $e->getMessage(), [
+                'item_id' => $item->id,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            // Return a safe error response
+            return response()->json([
+                'error' => 'Failed to load task details',
+                'message' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+                'task' => [
+                    'id' => $item->id,
+                    'code' => $item->item_code ?? 'N/A',
+                    'description' => $item->description ?? 'Unnamed Task',
+                    'uom' => '-',
+                    'quantity' => 0,
+                    'unit_price' => 0,
+                    'progress' => 0
+                ]
+            ], 500);
+        }
+    }
 }

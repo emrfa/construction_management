@@ -511,4 +511,266 @@
             </div>
         </div>
     </div>
+
+    {{-- Premium Quick Drill-Down Modal --}}
+    <div id="taskDrillDownModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            {{-- Background overlay --}}
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-50 -z-10" aria-hidden="true" onclick="closeTaskDrillDown()"></div>
+
+            {{-- Center modal --}}
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl sm:my-8 sm:align-middle sm:max-w-5xl sm:w-full relative z-10">
+                {{-- Compact Header with Gradient --}}
+                <div class="relative bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 overflow-hidden">
+                    {{-- Subtle decorative shape --}}
+                    <div class="absolute top-0 right-0 -mt-8 -mr-8 w-24 h-24 bg-white opacity-5 rounded-full"></div>
+                    
+                    <div class="relative flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-white" id="modalTaskTitle">Task Details</h3>
+                                <p class="text-indigo-100 text-xs" id="modalTaskCode">-</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="closeTaskDrillDown()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white bg-opacity-10 hover:bg-opacity-20 text-white transition-all duration-200">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                {{-- Loading State --}}
+                <div id="modalLoading" class="p-12 text-center">
+                    <svg class="animate-spin h-10 w-10 text-indigo-600 mx-auto" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="mt-3 text-sm text-gray-600">Loading task details...</p>
+                </div>
+
+                {{-- Modal Content --}}
+                <div id="modalContent" class="hidden">
+                    <div class="px-6 py-5 space-y-5">
+                        {{-- Compact Progress Card --}}
+                        <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg p-4 shadow-md">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p class="text-white text-opacity-90 text-xs font-medium">Current Progress</p>
+                                        <p class="text-3xl font-bold text-white" id="modalTaskProgress">0%</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-white text-opacity-90 text-xs font-medium">Quantity</p>
+                                    <p class="text-lg font-bold text-white" id="modalTaskQuantity">-</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Cost Breakdown Section --}}
+                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <div class="bg-gray-50 px-5 py-3 border-b border-gray-200">
+                                <h4 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Cost Breakdown</h4>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                                            <th class="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Budgeted</th>
+                                            <th class="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actual</th>
+                                            <th class="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Variance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-100" id="costBreakdownTable">
+                                        {{-- Populated by JavaScript --}}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {{-- Recent Updates Section --}}
+                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <div class="bg-gray-50 px-5 py-3 border-b border-gray-200">
+                                <h4 class="text-sm font-bold text-gray-900 uppercase tracking-wide">Recent Updates</h4>
+                            </div>
+                            <div class="p-5 space-y-3 max-h-96 overflow-y-auto" id="recentUpdatesList">
+                                {{-- Populated by JavaScript --}}
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Footer --}}
+                    <div class="bg-gray-50 px-6 py-3 border-t border-gray-200 sm:flex sm:flex-row-reverse">
+                        <button type="button" onclick="closeTaskDrillDown()" class="w-full inline-flex justify-center items-center rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors sm:w-auto">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openTaskDrillDown(taskId) {
+            const modal = document.getElementById('taskDrillDownModal');
+            const loading = document.getElementById('modalLoading');
+            const content = document.getElementById('modalContent');
+            
+            // Show modal and loading state
+            modal.classList.remove('hidden');
+            loading.classList.remove('hidden');
+            content.classList.add('hidden');
+            
+            const url = `/quotation-items/${taskId}/drill-down`;
+            
+            // Fetch data - SIMPLIFIED: No separate API, just regular route
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Helper function to format dates
+                    const formatDate = (dateString) => {
+                        if (!dateString) return '-';
+                        const date = new Date(dateString);
+                        return date.toLocaleDateString('id-ID', { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                        });
+                    };
+                    
+                    // Update header
+                    document.getElementById('modalTaskTitle').textContent = data.task.description;
+                    document.getElementById('modalTaskCode').textContent = `Code: ${data.task.code || '-'}`;
+                    document.getElementById('modalTaskProgress').textContent = `${data.task.progress}%`;
+                    document.getElementById('modalTaskQuantity').textContent = `${data.task.quantity} ${data.task.uom}`;
+                    
+                    // Update cost breakdown
+                    const costTable = document.getElementById('costBreakdownTable');
+                    const formatCurrency = (val) => {
+                        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
+                    };
+                    
+                    const categories = [
+                        { name: 'Materials', key: 'materials' },
+                        { name: 'Labor', key: 'labor' },
+                        { name: 'Equipment', key: 'equipment' },
+                        { name: 'Total', key: 'total' }
+                    ];
+                    
+                    costTable.innerHTML = categories.map(cat => {
+                        const budgeted = data.budget[cat.key];
+                        const actual = data.actual[cat.key];
+                        const variance = data.variance[cat.key];
+                        const isTotal = cat.key === 'total';
+                        
+                        return `
+                            <tr class="${isTotal ? 'bg-indigo-50 font-bold border-t-2 border-indigo-200' : 'hover:bg-gray-50 transition-colors'}">
+                                <td class="px-5 py-3 ${isTotal ? 'text-sm font-bold text-gray-900' : 'text-sm font-medium text-gray-700'}">${cat.name}</td>
+                                <td class="px-5 py-3 text-right ${isTotal ? 'text-sm font-bold text-gray-900' : 'text-sm text-gray-600'}">${formatCurrency(budgeted)}</td>
+                                <td class="px-5 py-3 text-right ${isTotal ? 'text-sm font-bold text-orange-600' : 'text-sm text-orange-600'}">${formatCurrency(actual)}</td>
+                                <td class="px-5 py-3 text-right ${isTotal ? 'text-sm font-bold' : 'text-sm font-semibold'} ${variance >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                    ${formatCurrency(variance)}
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                    
+                    // Update recent updates
+                    const updatesList = document.getElementById('recentUpdatesList');
+                    if (data.recent_updates.length === 0) {
+                        updatesList.innerHTML = `
+                            <div class="text-center py-12">
+                                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                                </svg>
+                                <p class="mt-4 text-sm font-medium text-gray-500">No progress updates yet</p>
+                            </div>
+                        `;
+                    } else {
+                        updatesList.innerHTML = data.recent_updates.map(update => {
+                            return `
+                                <div class="bg-white hover:bg-gray-50 rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-all duration-200">
+                                    <div class="flex items-start justify-between mb-3">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                                                ${update.progress}%
+                                            </div>
+                                            <div>
+                                                <p class="text-sm font-semibold text-gray-900">${formatDate(update.date)}</p>
+                                                <p class="text-xs text-gray-500">by ${update.user}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    ${update.notes ? `<p class="text-sm text-gray-700 mb-3 pl-13">${update.notes}</p>` : ''}
+                                    ${update.materials_used.length > 0 ? `
+                                        <div class="mt-3 pl-13">
+                                            <div class="flex items-center space-x-2 mb-2">
+                                                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                                                </svg>
+                                                <p class="text-xs font-bold text-gray-700 uppercase tracking-wide">Materials Used</p>
+                                            </div>
+                                            <div class="space-y-1">
+                                                ${update.materials_used.map(m => `
+                                                    <div class="flex items-center justify-between text-xs bg-gray-50 rounded-lg px-3 py-2">
+                                                        <span class="font-medium text-gray-700">${m.item}</span>
+                                                        <span class="text-gray-600">${m.quantity} ${m.uom}</span>
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                    
+                    // Hide loading, show content
+                    loading.classList.add('hidden');
+                    content.classList.remove('hidden');
+                })
+                .catch(error => {
+                    console.error('Error fetching task details:', error);
+                    loading.innerHTML = `
+                        <div class="text-center">
+                            <svg class="h-12 w-12 text-red-400 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p class="mt-2 text-sm text-red-600">Failed to load task details</p>
+                            <button onclick="closeTaskDrillDown()" class="mt-4 text-sm text-indigo-600 hover:text-indigo-800">Close</button>
+                        </div>
+                    `;
+                });
+        }
+        
+        function closeTaskDrillDown() {
+            document.getElementById('taskDrillDownModal').classList.add('hidden');
+        }
+        
+        // Close on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && !document.getElementById('taskDrillDownModal').classList.contains('hidden')) {
+                closeTaskDrillDown();
+            }
+        });
+    </script>
 </x-app-layout>

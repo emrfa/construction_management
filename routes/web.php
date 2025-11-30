@@ -41,6 +41,7 @@ Route::get('/dashboard', DashboardController::class)->middleware(['auth', 'verif
 
 Route::middleware('auth')->group(function () {
 
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -72,6 +73,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/projects/{project}/progress', [ProgressUpdateController::class, 'store'])->name('progress.store');
     Route::post('/projects/{project}/complete', [ProjectController::class, 'markAsComplete'])->name('projects.complete');
     Route::post('/projects/{project}/close', [ProjectController::class, 'markAsClosed'])->name('projects.close');
+    Route::get('/quotation-items/{item}/drill-down', [ProjectController::class, 'getTaskDrillDown'])->name('task.drill-down');
 
     // Adendum Management
     Route::get('/projects/{project}/adendums', [\App\Http\Controllers\AdendumController::class, 'index'])->name('projects.adendums.index');

@@ -67,9 +67,23 @@
                         </div>
                     </div>
                     <div class="mt-4 flex items-center text-sm">
-                        <span class="font-medium {{ $totalCpi >= 1 ? 'text-green-600' : 'text-red-600' }}">CPI: {{ number_format($totalCpi, 2) }}</span>
-                        <span class="mx-2 text-gray-300">|</span>
-                        <span class="text-gray-500">Efficiency Index</span>
+                        @if($netProfitTrend >= 0)
+                            <span class="text-green-600 font-medium flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                                </svg>
+                                {{ number_format(abs($netProfitTrend), 1) }}%
+                            </span>
+                            <span class="text-gray-400 ml-2">vs last month</span>
+                        @else
+                            <span class="text-red-600 font-medium flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+                                </svg>
+                                {{ number_format(abs($netProfitTrend), 1) }}%
+                            </span>
+                            <span class="text-gray-400 ml-2">vs last month</span>
+                        @endif
                     </div>
                 </div>
 
