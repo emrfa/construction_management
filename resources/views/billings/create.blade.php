@@ -1,4 +1,11 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Billings', 'url' => route('billings.index')],
+            ['label' => 'New Billing', 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             <a href="{{ route('projects.show', $project) }}" class="text-indigo-600 hover:text-indigo-900">

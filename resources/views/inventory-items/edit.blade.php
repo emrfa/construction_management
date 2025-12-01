@@ -1,4 +1,12 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Inventory', 'url' => route('inventory-items.index')],
+            ['label' => $inventoryItem->item_code, 'url' => ''],
+            ['label' => 'Edit', 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             {{ __('Edit Inventory Item') }}

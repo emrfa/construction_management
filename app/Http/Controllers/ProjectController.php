@@ -348,6 +348,21 @@ class ProjectController extends Controller
                 });
             }
 
+            // ADDENDUM ADJUSTMENT: If breakdown total doesn't match subtotal, scale proportionally
+            // This handles cases where addendum adjusts pricing but not the underlying AHS
+            $calculatedTotal = $budgetedCost['materials'] + $budgetedCost['labor'] + $budgetedCost['equipment'];
+            $actualTotal = (float) ($item->subtotal ?? 0);
+            
+            if ($calculatedTotal > 0 && abs($calculatedTotal - $actualTotal) > 0.01) {
+                // Scale factor to match the actual subtotal
+                $scaleFactor = $actualTotal / $calculatedTotal;
+                $budgetedCost['materials'] *= $scaleFactor;
+                $budgetedCost['labor'] *= $scaleFactor;
+                $budgetedCost['equipment'] *= $scaleFactor;
+            }
+            
+            $budgetedCost['total'] = $actualTotal;
+
             // Get actual costs from progress updates
             if ($progressUpdates->isNotEmpty()) {
                 foreach ($progressUpdates as $update) {

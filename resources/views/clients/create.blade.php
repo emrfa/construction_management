@@ -1,4 +1,11 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Clients', 'url' => route('clients.index')],
+            ['label' => 'New Client', 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             {{ __('Add New Client') }}

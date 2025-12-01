@@ -1,15 +1,15 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Quotations', 'url' => route('quotations.index')],
+            ['label' => $quotation->quotation_no, 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('Quotation Details') }}
-            </h2>
-            <div class="flex items-center gap-3">
-                <a href="{{ route('quotations.index') }}" class="text-sm text-gray-600 hover:text-gray-900">
-                    &larr; Back to List
-                </a>
-            </div>
-        </div>
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ __('Quotation Details') }}
+        </h2>
     </x-slot>
 
     <div class="py-12">

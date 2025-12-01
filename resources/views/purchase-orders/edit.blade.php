@@ -1,4 +1,12 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Purchase Orders', 'url' => route('purchase-orders.index')],
+            ['label' => $purchaseOrder->po_number, 'url' => route('purchase-orders.show', $purchaseOrder)],
+            ['label' => 'Edit', 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             {{ __('Edit Purchase Order') }} ({{ $purchaseOrder->po_number }}) - DRAFT

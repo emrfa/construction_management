@@ -457,7 +457,13 @@
                     @if (isset($header))
                         <header class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-10">
                             <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                                {{ $header }}
+                                {{-- Breadcrumbs replace header title --}}
+                                @isset($breadcrumbs)
+                                    {{ $breadcrumbs }}
+                                @else
+                                    {{-- Fallback to header if no breadcrumbs --}}
+                                    {{ $header }}
+                                @endisset
                             </div>
                         </header>
                     @endif

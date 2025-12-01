@@ -1,4 +1,11 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Work Items', 'url' => route('work-items.index')],
+            ['label' => 'New Work Item', 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             {{ __('Add New Work Item to Library') }}

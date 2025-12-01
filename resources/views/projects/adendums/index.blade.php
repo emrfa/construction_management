@@ -1,4 +1,12 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Projects', 'url' => route('projects.index')],
+            ['label' => $project->project_code, 'url' => route('projects.show', $project)],
+            ['label' => 'Adendums', 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
@@ -68,12 +76,6 @@
                                 @endforelse
                             </tbody>
                         </table>
-                    </div>
-
-                    <div class="mt-4">
-                        <a href="{{ route('projects.show', $project) }}" class="text-gray-600 hover:text-gray-900 underline">
-                            &larr; Back to Project
-                        </a>
                     </div>
                 </div>
             </div>

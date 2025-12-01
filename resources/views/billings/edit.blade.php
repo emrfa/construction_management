@@ -1,4 +1,12 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Billings', 'url' => route('billings.index')],
+            ['label' => $billing->billing_no, 'url' => route('billings.show', $billing)],
+            ['label' => 'Edit', 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             <a href="{{ route('billings.show', $billing) }}" class="text-indigo-600 hover:text-indigo-900">

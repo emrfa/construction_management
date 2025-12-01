@@ -1,4 +1,12 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Equipment', 'url' => route('equipment.index')],
+            ['label' => $equipment->name, 'url' => route('equipment.show', $equipment)],
+            ['label' => 'Edit', 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             {{ __('Edit Equipment Record') }}: {{ $equipment->name }}

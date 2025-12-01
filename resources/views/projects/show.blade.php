@@ -1,11 +1,14 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Projects', 'url' => route('projects.index')],
+            ['label' => $project->project_code, 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            <a href="{{ route('projects.index') }}" class="text-indigo-600 hover:text-indigo-900">
-                &larr; All Projects
-            </a>
-            <span class="text-gray-500">/</span>
-            <span>{{ $project->project_code }}</span>
+            {{ $project->quotation->project_name }}
         </h2>
     </x-slot>
     
@@ -698,50 +701,61 @@
                     const updatesList = document.getElementById('recentUpdatesList');
                     if (data.recent_updates.length === 0) {
                         updatesList.innerHTML = `
-                            <div class="text-center py-12">
-                                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="text-center py-8">
+                                <svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
                                 </svg>
-                                <p class="mt-4 text-sm font-medium text-gray-500">No progress updates yet</p>
+                                <p class="mt-3 text-sm text-gray-500">No progress updates yet</p>
                             </div>
                         `;
                     } else {
-                        updatesList.innerHTML = data.recent_updates.map(update => {
-                            return `
-                                <div class="bg-white hover:bg-gray-50 rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-all duration-200">
-                                    <div class="flex items-start justify-between mb-3">
-                                        <div class="flex items-center space-x-3">
-                                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
-                                                ${update.progress}%
-                                            </div>
-                                            <div>
-                                                <p class="text-sm font-semibold text-gray-900">${formatDate(update.date)}</p>
-                                                <p class="text-xs text-gray-500">by ${update.user}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    ${update.notes ? `<p class="text-sm text-gray-700 mb-3 pl-13">${update.notes}</p>` : ''}
-                                    ${update.materials_used.length > 0 ? `
-                                        <div class="mt-3 pl-13">
-                                            <div class="flex items-center space-x-2 mb-2">
-                                                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                                                </svg>
-                                                <p class="text-xs font-bold text-gray-700 uppercase tracking-wide">Materials Used</p>
-                                            </div>
-                                            <div class="space-y-1">
-                                                ${update.materials_used.map(m => `
-                                                    <div class="flex items-center justify-between text-xs bg-gray-50 rounded-lg px-3 py-2">
-                                                        <span class="font-medium text-gray-700">${m.item}</span>
-                                                        <span class="text-gray-600">${m.quantity} ${m.uom}</span>
-                                                    </div>
-                                                `).join('')}
-                                            </div>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            `;
-                        }).join('');
+                        updatesList.innerHTML = `
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Progress</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Materials</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-100">
+                                    ${data.recent_updates.map(update => {
+                                        const materialsCount = update.materials_used.length;
+                                        const materialsSummary = materialsCount > 0 
+                                            ? update.materials_used.map(m => `${m.item} (${m.quantity} ${m.uom})`).join(', ')
+                                            : '-';
+                                        
+                                        return `
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">${formatDate(update.date)}</td>
+                                                <td class="px-4 py-3 text-center whitespace-nowrap">
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                                        update.progress == 100 ? 'bg-green-100 text-green-800' : 
+                                                        update.progress >= 50 ? 'bg-blue-100 text-blue-800' : 
+                                                        'bg-gray-100 text-gray-800'
+                                                    }">
+                                                        ${update.progress}%
+                                                    </span>
+                                                </td>
+                                                <td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">${update.user}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title="${update.notes || '-'}">
+                                                    ${update.notes || '-'}
+                                                </td>
+                                                <td class="px-4 py-3 text-center text-sm">
+                                                    ${materialsCount > 0 ? `
+                                                        <button onclick="alert('${materialsSummary.replace(/'/g, "\\'")}')" class="text-indigo-600 hover:text-indigo-800 font-medium">
+                                                            ${materialsCount} item${materialsCount > 1 ? 's' : ''}
+                                                        </button>
+                                                    ` : '<span class="text-gray-400">-</span>'}
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        `;
                     }
                     
                     // Hide loading, show content

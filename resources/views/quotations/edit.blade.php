@@ -1,8 +1,15 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Quotations', 'url' => route('quotations.index')],
+            ['label' => $quotation->quotation_no, 'url' => route('quotations.show', $quotation)],
+            ['label' => 'Edit', 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{-- CHANGED --}}
-            {{ __('Edit Quotation (RAB / BOQ)') }}: {{ $quotation->quotation_no }}
+            {{ __('Edit Quotation') }}
         </h2>
     </x-slot>
 

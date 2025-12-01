@@ -1,12 +1,15 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Purchase Orders', 'url' => route('purchase-orders.index')],
+            ['label' => $purchaseOrder->po_number, 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                <a href="{{ route('purchase-orders.index') }}" class="text-indigo-600 hover:text-indigo-900">
-                    &larr; All Purchase Orders
-                </a>
-                <span class="text-gray-500">/</span>
-                <span>PO {{ $purchaseOrder->po_number }}</span>
+                PO {{ $purchaseOrder->po_number }}
             </h2>
             <div class="flex items-center space-x-2">
                 @if ($purchaseOrder->status == 'draft')

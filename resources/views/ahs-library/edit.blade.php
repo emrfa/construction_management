@@ -1,4 +1,12 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'AHS Library', 'url' => route('ahs-library.index')],
+            ['label' => $ahs_library->code, 'url' => route('ahs-library.show', $unitRateAnalysis)],
+            ['label' => 'Edit', 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             {{ __('Edit AHS Definition') }}: {{ $ahs_library->name }}

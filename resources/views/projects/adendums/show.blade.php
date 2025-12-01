@@ -1,4 +1,13 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Projects', 'url' => route('projects.index')],
+            ['label' => $project->project_code, 'url' => route('projects.show', $project)],
+            ['label' => 'Adendums', 'url' => route('projects.adendums.index', $project)],
+            ['label' => $adendum->adendum_no, 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             {{ __('Adendum Details: ') }} {{ $adendum->adendum_no }}

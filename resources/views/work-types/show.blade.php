@@ -1,4 +1,11 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Work Types', 'url' => route('work-types.index')],
+            ['label' => $work_type->name, 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             {{-- FIX: Changed $workType to $work_type --}}

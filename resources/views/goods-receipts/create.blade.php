@@ -1,4 +1,11 @@
 <x-app-layout>
+    <x-slot name="breadcrumbs">
+        <x-breadcrumbs :items="[
+            ['label' => 'Goods Receipts', 'url' => route('goods-receipts.index')],
+            ['label' => 'New Receipt', 'url' => '']
+        ]" />
+    </x-slot>
+
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             <a href="{{ route('goods-receipts.index') }}" class="text-indigo-600 hover:text-indigo-900">
