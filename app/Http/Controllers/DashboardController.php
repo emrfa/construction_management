@@ -107,24 +107,24 @@ class DashboardController extends Controller
         foreach ($activeProjects as $project) {
             
             // [FIXED] Calculate Actual Progress using the CORRECT weighted average
-            $project->actual_progress = $this->getWbsActualProgress($project);
+            $project->actual_progress = $project->getWbsActualProgress();
             
             // Calculate Planned Progress
-            $project->planned_progress = $this->getWbsPlannedProgress($project);
+            $project->planned_progress = $project->getWbsPlannedProgress();
 
             // Check Schedule
-            if ($project->actual_progress >= $project->planned_progress - 0.01) {
+            if ($project->time_status === 'on_track' || $project->time_status === 'completed') {
                 $projectsOnTrackCount++;
             } else {
                 $projectsDelayedCount++;
             }
             
             // Calculate EV, AC, and CV for each project
-            $project->actual_cost = $project->quotation->allItems->sum('actual_cost'); // Summing accessor is fine
-            $project->earned_value = (float)$project->total_budget * ($project->actual_progress / 100);
-            $project->cost_variance = $project->earned_value - $project->actual_cost;
+            $project->actual_cost = $project->actual_cost; // Trigger accessor
+            $project->earned_value = $project->earned_value; // Trigger accessor
+            $project->cost_variance = $project->cost_variance; // Trigger accessor
 
-            if ($project->cost_variance < 0) {
+            if ($project->budget_status === 'over_budget') {
                 $projectsOverBudgetCount++;
             }
 
@@ -253,65 +253,5 @@ class DashboardController extends Controller
 
         return $totalActualCost;
     }
-    /**
-     * [NEW] Calculates the "Akumulasi Actual" using a budget-weighted average.
-     */
-    private function getWbsActualProgress(Project $project): float
-    {
-        $totalBudget = (float) $project->total_budget;
-        if ($totalBudget == 0) {
-            return 0;
-        }
 
-        $tasks = $project->quotation->allItems->filter(fn($item) => $item->children->isEmpty());
-        $totalEarnedValue = 0;
-
-        foreach ($tasks as $task) {
-            $taskWeight = (float)$task->subtotal; // The budget of the task
-            $taskProgress = (float)$task->latest_progress; // The actual % complete
-            $totalEarnedValue += $taskWeight * ($taskProgress / 100);
-        }
-
-        return round(($totalEarnedValue / $totalBudget) * 100, 2);
-    }
-
-    /**
-     * Calculates the "Akumulasi Rencana" based on the WBS schedule.
-     */
-    private function getWbsPlannedProgress(Project $project): float
-    {
-        $totalBudget = (float) $project->total_budget;
-        if ($totalBudget == 0) {
-            return 0;
-        }
-
-        $project->loadMissing('quotation.allItems'); // Ensure allItems are loaded
-        $tasks = $project->quotation->allItems->filter(fn($item) => $item->children->isEmpty());
-        $today = Carbon::today();
-        $totalPlannedValue = 0;
-
-        foreach ($tasks as $task) {
-            $taskWeight = (float)$task->subtotal;
-            $planned_start = $task->planned_start ? Carbon::parse($task->planned_start) : null;
-            $planned_end = $task->planned_end ? Carbon::parse($task->planned_end) : null;
-
-            if ($planned_start && $planned_end && $planned_start <= $today) {
-                if ($today >= $planned_end) {
-                    $totalPlannedValue += $taskWeight;
-                } else {
-                    $totalDuration = $planned_start->diffInDays($planned_end) + 1;
-                    $elapsedDuration = $planned_start->diffInDays($today) + 1;
-                    
-                    if ($totalDuration <= 0) {
-                         $totalPlannedValue += $taskWeight;
-                    } else {
-                        $taskPlannedProgress = ($elapsedDuration / $totalDuration);
-                        $totalPlannedValue += $taskWeight * $taskPlannedProgress;
-                    }
-                }
-            }
-        }
-        
-        return round(($totalPlannedValue / $totalBudget) * 100, 2);
-    }
 }

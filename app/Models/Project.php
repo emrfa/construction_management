@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
+use Carbon\Carbon;
 
 class Project extends Model
 {
@@ -243,5 +244,105 @@ class Project extends Model
         }
 
         return false;
+    }
+    /**
+     * Calculates the "Akumulasi Actual" using a budget-weighted average.
+     */
+    public function getWbsActualProgress(): float
+    {
+        $totalBudget = (float) $this->total_budget;
+        if ($totalBudget == 0) {
+            return 0;
+        }
+
+        $this->loadMissing('quotation.allItems');
+        if (!$this->quotation) return 0;
+
+        $tasks = $this->quotation->allItems->filter(fn($item) => $item->children->isEmpty());
+        $totalEarnedValue = 0;
+
+        foreach ($tasks as $task) {
+            $taskWeight = (float)$task->subtotal; // The budget of the task
+            $taskProgress = (float)$task->latest_progress; // The actual % complete
+            $totalEarnedValue += $taskWeight * ($taskProgress / 100);
+        }
+
+        return round(($totalEarnedValue / $totalBudget) * 100, 2);
+    }
+
+    /**
+     * Calculates the "Akumulasi Rencana" based on the WBS schedule.
+     */
+    public function getWbsPlannedProgress(): float
+    {
+        $totalBudget = (float) $this->total_budget;
+        if ($totalBudget == 0) {
+            return 0;
+        }
+
+        $this->loadMissing('quotation.allItems'); // Ensure allItems are loaded
+        if (!$this->quotation) return 0;
+
+        $tasks = $this->quotation->allItems->filter(fn($item) => $item->children->isEmpty());
+        $today = Carbon::today();
+        $totalPlannedValue = 0;
+
+        foreach ($tasks as $task) {
+            $taskWeight = (float)$task->subtotal;
+            $planned_start = $task->planned_start ? Carbon::parse($task->planned_start) : null;
+            $planned_end = $task->planned_end ? Carbon::parse($task->planned_end) : null;
+
+            if ($planned_start && $planned_end && $planned_start <= $today) {
+                if ($today >= $planned_end) {
+                    $totalPlannedValue += $taskWeight;
+                } else {
+                    $totalDuration = $planned_start->diffInDays($planned_end) + 1;
+                    $elapsedDuration = $planned_start->diffInDays($today) + 1;
+                    
+                    if ($totalDuration <= 0) {
+                         $totalPlannedValue += $taskWeight;
+                    } else {
+                        $taskPlannedProgress = ($elapsedDuration / $totalDuration);
+                        $totalPlannedValue += $taskWeight * $taskPlannedProgress;
+                    }
+                }
+            }
+        }
+        
+        return round(($totalPlannedValue / $totalBudget) * 100, 2);
+    }
+
+    public function getEarnedValueAttribute(): float
+    {
+        return (float)$this->total_budget * ($this->getWbsActualProgress() / 100);
+    }
+
+    public function getCostVarianceAttribute(): float
+    {
+        return $this->earned_value - $this->actual_cost;
+    }
+
+    public function getTimeStatusAttribute(): string
+    {
+        if ($this->status === 'completed') {
+            return 'completed';
+        }
+
+        $actualProgress = $this->getWbsActualProgress();
+        $plannedProgress = $this->getWbsPlannedProgress();
+
+        if ($actualProgress >= $plannedProgress - 0.01) {
+            return 'on_track';
+        }
+
+        return 'delayed';
+    }
+
+    public function getBudgetStatusAttribute(): string
+    {
+        if ($this->cost_variance < 0) {
+            return 'over_budget';
+        }
+        return 'on_budget';
     }
 }
